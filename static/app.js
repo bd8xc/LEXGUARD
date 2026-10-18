@@ -1,516 +1,234 @@
-const $ = (selector) => document.querySelector(selector);
-const normalizePartyName = (name) => name.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
-const form = $('#analysis-form');
-const textBox = $('#contract-text');
-const leToggle = $('#include-le');
-const button = $('#submit-button');
-let modelsReady = false;
-let initializationPromise = null;
-let healthMonitorStarted = false;
-let healthRefreshRunning = false;
+/* LexGuard — progressive, multi-page UI. No client-side routing or synthetic response substitution. */
+'use strict';
+const $ = (selector, root=document) => root.querySelector(selector);
+const $$ = (selector, root=document) => [...root.querySelectorAll(selector)];
+const clean = x => x == null ? '' : String(x);
+const el = (tag, cls='', text) => { const node = document.createElement(tag); if (cls) node.className=cls; if (text!==undefined) node.textContent=clean(text); return node; };
+const add = (parent,...nodes) => { nodes.filter(Boolean).forEach(n=>parent.append(n));return parent;};
+const currencyFree = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString(undefined,{maximumFractionDigits:1}) : '—';
+const safeState = s => ['complete','success','ready'].includes(s) ? 'complete' : 'partial';
+const SUMMARY_KEY='lexguard-latest-report-v1';
+const exampleContract = `MASTER SERVICES AGREEMENT — SYNTHETIC EXAMPLE\n\nThis example agreement is entered into by Alpha Corp (Customer) and Vendor Four GmbH (Supplier). It contains fictional entities for interface testing.\n\n1. Services. Supplier shall implement the inventory platform and deliver agreed milestones, subject to acceptance testing within ten business days.\n\n2. Term. The agreement runs for two years and renews automatically for one year unless a party gives sixty days written notice.\n\n3. Fees. Customer shall pay undisputed invoices within thirty days of receipt. Extra work requires written approval.\n\n4. Confidentiality. Each party must protect confidential information and restrict access. The test notices contact is qa-notices@example.org.\n\n5. Liability. The supplier indemnifies the customer against third-party intellectual property claims. Total liability is limited to the preceding twelve months of fees, except for fraud or deliberate misconduct.\n\n6. Governing law. Indian law governs this agreement. The courts at Bengaluru have exclusive jurisdiction.`;
 
-textBox.addEventListener('input', () => { $('#char-count').textContent = `${textBox.value.length.toLocaleString()} / 120,000`; });
-leToggle.addEventListener('change', () => { $('#le-fields').hidden = !leToggle.checked; });
-document.querySelectorAll('.choice-group').forEach((group) => {
-  group.addEventListener('click', (event) => {
-    const choice = event.target.closest('button[data-value]');
-    if (!choice) return;
-    group.querySelectorAll('button').forEach((button) => button.classList.toggle('selected', button === choice));
-    group.dataset.selected = choice.dataset.value;
+function themeInit(){
+  $$('[data-theme-toggle]').forEach(btn=>btn.addEventListener('click',()=>{
+    const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
+    document.documentElement.dataset.theme=next;
+    try{localStorage.setItem('lexguard-theme',next)}catch{}
+  }));
+  const m=$('[data-menu-toggle]'),nav=$('#mobile-nav');
+  if(m&&nav){m.addEventListener('click',()=>{const open=m.getAttribute('aria-expanded')==='true';m.setAttribute('aria-expanded',String(!open));nav.hidden=open;});nav.addEventListener('click',e=>{if(e.target.closest('a')){nav.hidden=true;m.setAttribute('aria-expanded','false')}});}
+}
+function notify(msg){const toast=$('#toast');if(!toast)return;toast.textContent=msg;toast.hidden=false;clearTimeout(notify.timer);notify.timer=setTimeout(()=>toast.hidden=true,3800)}
+function showError(selector,message){const node=typeof selector==='string'?$(selector):selector;if(!node)return;node.textContent=message;node.hidden=false;node.scrollIntoView({behavior:'smooth',block:'center'});}
+function clearError(selector){const node=typeof selector==='string'?$(selector):selector;if(node){node.hidden=true;node.textContent=''}}
+function parsedError(data,status){
+  if(Array.isArray(data?.detail)){return data.detail.map(d=>`${(d.loc||[]).slice(1).join(' → ') || 'Input'}: ${d.msg}`).join(' · ')}
+  if(typeof data?.detail==='string')return data.detail;
+  return `Request failed (${status}). Check API readiness and try again.`;
+}
+async function postJson(url,body){
+  let response;
+  try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+  catch{throw new Error('Could not contact the LexGuard server. Make sure the backend is running.');}
+  const text=await response.text();let data;
+  try{data=JSON.parse(text)}catch{data={detail:text||'Invalid server response'}}
+  if(!response.ok)throw new Error(parsedError(data,response.status));
+  return data;
+}
+async function systemStatus(){
+  try{
+    const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error('offline');const d=await r.json();
+    const ready=['coi','cr','cl','le'].filter(k=>d[k]==='ready').length;
+    $$('.live-chip').forEach(n=>{n.classList.toggle('is-ready',ready===4);n.classList.toggle('is-partial',ready<4);});
+    $$('[data-system-label]').forEach(n=>n.textContent=ready===4?'All systems ready':`${ready} of 4 agents ready`);
+    const labels={ready:'Ready',unavailable:'Unavailable',missing_model:'Model missing',degraded:'Degraded',groq_fallback:'Fallback'};
+    $$('[data-agent-status]').forEach(n=>{let s=d[n.dataset.agentStatus];n.textContent=labels[s]||clean(s||'Unknown').replace(/_/g,' ');n.style.color=s==='ready'?'var(--mint)':'var(--amber)';});
+  }catch{
+    $$('.live-chip').forEach(n=>n.classList.add('is-partial'));
+    $$('[data-system-label]').forEach(n=>n.textContent='API unavailable');
+    $$('[data-agent-status]').forEach(n=>n.textContent='Not connected');
+  }
+}
+function filesFromText(input){return clean(input||'').split(',').map(s=>s.trim()).filter(Boolean)}
+function fieldValue(form,name){return form.elements.namedItem(name)?.value?.trim()||''}
+function numeric(form,name){return Number(fieldValue(form,name))}
+function modelFeatures(form){return {
+  deal_size:numeric(form,'deal_size'),liability_cap:numeric(form,'liability_cap'),auto_renewal:numeric(form,'auto_renewal'),
+  jurisdiction_risk:numeric(form,'jurisdiction_risk'),indemnification_clause:numeric(form,'indemnification_clause'),
+  dispute_history:numeric(form,'dispute_history'),governing_law_clarity:numeric(form,'governing_law_clarity')
+};}
+function validateFields(node){
+  for(const control of $$('input,textarea,select',node)){
+    if(control.type==='file'||control.type==='checkbox'&&control.id!=='acknowledge')continue;
+    if(control.required && !clean(control.value).trim())return `${control.closest('.field')?.querySelector('span')?.textContent?.replace('*','').trim()||'A required field'} is required.`;
+    if(!control.checkValidity())return control.validationMessage || 'Please check the highlighted field.';
+  }
+  const entities=$('[name="contract_entities"]',node);
+  if(entities&&filesFromText(entities.value).length>13)return 'Please enter no more than 13 additional entities.';
+  return '';
+}
+let fileLoading=false;
+function setupExtraction(fileId,textareaSelector){
+  const file=$(fileId),area=$(textareaSelector),drop=$('#dropzone'),status=$('#upload-status');
+  if(!file||!area)return;
+  async function extract(f){
+    if(!f)return;
+    if(!/\.(txt|pdf|docx)$/i.test(f.name)){status.textContent='Use a TXT, PDF, or DOCX file.';return}
+    if(f.size>5*1024*1024){status.textContent='This file exceeds the 5 MB limit.';return}
+    fileLoading=true;status.textContent=`Extracting ${f.name}…`;
+    try{
+      const form=new FormData();form.append('file',f);
+      const r=await fetch('/api/extract',{method:'POST',body:form});let data=await r.json();
+      if(!r.ok)throw Error(parsedError(data,r.status));
+      area.value=data.text||'';area.dispatchEvent(new Event('input',{bubbles:true}));
+      status.textContent=`${f.name} extracted. Review and verify the text below before analysis.`;
+      notify('Document extracted. Please review the text.');
+    }catch(e){status.textContent=e.message||'Unable to extract this file.';}
+    finally{fileLoading=false;file.value='';}
+  }
+  file.addEventListener('change',()=>extract(file.files[0]));
+  if(drop){['dragenter','dragover'].forEach(k=>drop.addEventListener(k,e=>{e.preventDefault();drop.classList.add('dragover')}));
+    ['dragleave','drop'].forEach(k=>drop.addEventListener(k,e=>{e.preventDefault();drop.classList.remove('dragover')}));
+    drop.addEventListener('drop',e=>extract(e.dataTransfer?.files?.[0]));}
+}
+function setExample(form,fillContext=false){
+  const t=$('[name="contract_text"]',form);if(t){t.value=exampleContract;t.dispatchEvent(new Event('input',{bubbles:true}))}
+  if(fillContext){
+    const values={client_entity:'Alpha Corp',counterparty_entity:'Vendor Four GmbH',deal_size:750000,liability_cap:1,auto_renewal:1,jurisdiction_risk:5,indemnification_clause:1,dispute_history:0,governing_law_clarity:3,deviation:35};
+    Object.entries(values).forEach(([k,v])=>{const c=form.elements.namedItem(k);if(c)c.value=v});
+  }
+  notify('Synthetic example loaded. No real-client facts are implied.');
+}
+function setLoading(btn,busy,normal){if(!btn)return;btn.disabled=busy;btn.textContent=busy?'Analyzing…':normal;}
+function miniKpi(label,value){const d=el('div');add(d,el('small','',label),el('strong','',value));return d;}
+function renderStepRecap(form){const target=$('#review-recap');target.replaceChildren();
+  const t=fieldValue(form,'contract_text'),client=fieldValue(form,'client_entity'),counterparty=fieldValue(form,'counterparty_entity'),deviation=fieldValue(form,'deviation');
+  add(target,miniKpi('REPRESENTED ENTITY',client),miniKpi('COUNTERPARTY',counterparty),miniKpi('DOCUMENT SIZE',`${t.length.toLocaleString()} characters`),miniKpi('EXPOSURE MODEL',deviation===''?'Will be skipped if COI completes':'Deviation provided · '+deviation+'%'));
+}
+function reviewInit(){
+  const form=$('#review-form');if(!form)return;
+  const t=$('#contract-text');t.addEventListener('input',()=>$('#char-count').textContent=`${t.value.length.toLocaleString()} characters`);
+  $('#load-example').addEventListener('click',()=>setExample(form,true));setupExtraction('#review-file','#contract-text');
+  let step=1,sending=false;const panels=$$('.step-panel'),back=$('#prev-step'),next=$('#next-step'),submit=$('#review-submit');
+  function move(to){step=to;panels.forEach(p=>p.hidden=Number(p.dataset.step)!==step);$$('[data-progress-label]').forEach(n=>{const val=Number(n.dataset.progressLabel);n.classList.toggle('current',val===step);n.classList.toggle('done',val<step)});$('#progress-fill').style.width=`${step/3*100}%`;back.hidden=step===1;next.hidden=step===3;submit.hidden=step!==3;clearError('#review-error');if(step===3)renderStepRecap(form);window.scrollTo({top:180,behavior:'smooth'});}
+  back.addEventListener('click',()=>move(Math.max(1,step-1)));
+  next.addEventListener('click',()=>{
+    if(fileLoading){showError('#review-error','Document extraction is still in progress.');return}
+    const invalid=validateFields(panels[step-1]);if(invalid){showError('#review-error',invalid);return}
+    if(step===1&&t.value.trim().length<40){showError('#review-error','Enter at least 40 characters of contract text.');return}
+    move(Math.min(3,step+1));
   });
-});
-
-function renderInitializationStatus(status) {
-  const percent = Math.max(0, Math.min(100, Number(status.progress) || 0));
-  $('#readiness-progress').style.width = `${percent}%`;
-  $('#readiness-percent').textContent = `${percent}%`;
-  $('#readiness-message').textContent = status.message || 'Preparing analysis agents.';
-  for (const [name, value] of Object.entries(status.agents || {})) {
-    const card = document.querySelector(`.agent-check[data-agent="${name}"]`);
-    if (!card) continue;
-    card.dataset.status = value;
-    card.querySelector('.check-indicator').textContent = value === 'ready' ? '✓' : value === 'loading' ? '…' : value === 'error' ? '!' : '·';
-    card.querySelector('em').textContent = value === 'ready' ? 'Ready' : value === 'loading' ? 'Loading' : value === 'error' ? 'Error' : 'Waiting';
-  }
-  $('#retry-initialization').hidden = status.status !== 'failed';
-  if (status.status === 'ready') {
-    modelsReady = true;
-    startAgentHealthMonitoring();
-  }
-}
-
-function renderAgentHealth(report) {
-  for (const [name, result] of Object.entries(report.agents || {})) {
-    const element = document.querySelector(`.health-check[data-health="${name}"]`);
-    if (!element) continue;
-    const state = result.status || 'pending';
-    element.textContent = `Health: ${state === 'healthy' ? 'OK' : state}`;
-    element.dataset.status = state;
-    element.title = result.message || '';
-  }
-}
-
-async function refreshAgentHealth() {
-  if (healthRefreshRunning || !modelsReady) return;
-  healthRefreshRunning = true;
-  try {
-    await fetch('/agent-health-check', { method: 'POST' });
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      const response = await fetch('/agent-health');
-      if (!response.ok) throw new Error('Health status request failed.');
-      const report = await response.json();
-      renderAgentHealth(report);
-      if (report.status !== 'checking') break;
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  } catch {
-    document.querySelectorAll('.health-check').forEach((element) => { element.textContent = 'Health: unavailable'; element.dataset.status = 'unavailable'; });
-  } finally {
-    healthRefreshRunning = false;
-  }
-}
-
-function startAgentHealthMonitoring() {
-  if (healthMonitorStarted) return;
-  healthMonitorStarted = true;
-  refreshAgentHealth();
-  window.setInterval(() => {
-    if (document.visibilityState === 'visible') refreshAgentHealth();
-  }, 30000);
-}
-
-async function fetchInitializationStatus() {
-  const response = await fetch('/initialization-status');
-  if (!response.ok) throw new Error('Could not read agent initialization status.');
-  return response.json();
-}
-
-async function initializeModels() {
-  renderInitializationStatus({ status: 'initializing', progress: 1, message: 'Starting background initialization…', agents: { CRA: 'pending', CL: 'pending', COI: 'pending', LE: 'pending' } });
-  const startResponse = await fetch('/initialize', { method: 'POST' });
-  if (!startResponse.ok) throw new Error('Could not start model initialization.');
-  while (true) {
-    const status = await fetchInitializationStatus();
-    renderInitializationStatus(status);
-    if (status.status === 'ready') return;
-    if (status.status === 'failed') throw new Error(status.message || 'Agent initialization failed.');
-    await new Promise((resolve) => setTimeout(resolve, 900));
-  }
-}
-
-function ensureModelsReady() {
-  if (modelsReady) return Promise.resolve();
-  if (!initializationPromise) {
-    initializationPromise = initializeModels().catch((error) => {
-      $('#readiness-message').textContent = error.message || 'Agent initialization failed.';
-      $('#retry-initialization').hidden = false;
-      initializationPromise = null;
-      throw error;
-    });
-  }
-  return initializationPromise;
-}
-
-$('#retry-initialization').addEventListener('click', () => {
-  ensureModelsReady().catch(() => {});
-});
-
-// Warm all agents as soon as the frontend opens; contract submission can share this promise.
-ensureModelsReady().catch(() => {});
-
-function node(tag, className, content) {
-  const element = document.createElement(tag);
-  if (className) element.className = className;
-  if (content !== undefined && content !== null) element.textContent = String(content);
-  return element;
-}
-function showState(name) {
-  $('#empty-state').hidden = name !== 'empty';
-  $('#result-content').hidden = name !== 'result';
-}
-function label(value, fallback = 'Unknown') {
-  return value === undefined || value === null || value === '' ? fallback : String(value);
-}
-function riskClass(value) {
-  const normalized = String(value || '').toLowerCase();
-  return normalized.includes('high') ? 'risk-high' : normalized.includes('medium') ? 'risk-medium' : (normalized.includes('low') ? 'risk-low' : 'risk-baseline');
-}
-function metric(title, value, sub = '') {
-  const box = node('div', 'metric');
-  box.append(node('div', 'metric-label', title), node('div', 'metric-value', value), node('div', 'metric-sub', sub));
-  return box;
-}
-function uniqueByOccurrence(items, typeKey = 'type') {
-  const seen = new Set();
-  return (items || []).filter((item) => {
-    const key = [item.clause_id || '', item.start ?? '', item.end ?? '', item[typeKey] || '', item.value || ''].join('|');
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();if(sending||fileLoading)return;clearError('#review-error');
+    if(!$('#acknowledge').checked){showError('#review-error','Please acknowledge the data handling and human review requirements.');return}
+    for(const panel of panels.slice(0,2)){const invalid=validateFields(panel);if(invalid){showError('#review-error',invalid);return}}
+    const d=fieldValue(form,'deviation');const payload={doc_id:`review-${Date.now()}`,client_entity:fieldValue(form,'client_entity'),counterparty_entity:fieldValue(form,'counterparty_entity'),contract_entities:filesFromText(fieldValue(form,'contract_entities')),contract_text:fieldValue(form,'contract_text'),features:modelFeatures(form)};
+    if(d!=='')payload.clause_deviation_override=Number(d)/100;
+    sending=true;setLoading(submit,true,'Run analysis →');
+    try{
+      const result=await postJson('/api/analyze',payload);
+      try{sessionStorage.setItem(SUMMARY_KEY,JSON.stringify({receivedAt:new Date().toISOString(),result}))}
+      catch{throw Error('This browser cannot retain the report between pages. Enable session storage or use the developer console to run the API directly.')}
+      window.location.assign('/results');
+    }catch(err){showError('#review-error',err.message||'Review could not complete.');}
+    finally{sending=false;setLoading(submit,false,'Run analysis →')}
   });
 }
-function uniqueFindingsByOccurrence(items) {
-  const sensitivityRank = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, CONTEXT_DEPENDENT: 1 };
-  const byOccurrence = new Map();
-  for (const item of items || []) {
-    const hasSpan = item.start !== null && item.start !== undefined && item.end !== null && item.end !== undefined
-      && Number.isFinite(Number(item.start)) && Number.isFinite(Number(item.end));
-    const key = hasSpan
-      ? [item.clause_id || '', item.start, item.end].join('|')
-      : [item.clause_id || '', String(item.value || '').trim().toLocaleLowerCase(), item.type || ''].join('|');
-    const previous = byOccurrence.get(key);
-    const rank = sensitivityRank[String(item.sensitivity || '').toUpperCase()] || 0;
-    const previousRank = sensitivityRank[String(previous?.sensitivity || '').toUpperCase()] || 0;
-    const isMoreSpecific = previous?.source === 'ner' && item.source !== 'ner';
-    if (!previous || rank > previousRank || (rank === previousRank && isMoreSpecific)) byOccurrence.set(key, item);
+function downloadableJson(data,name){const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(b),a=document.createElement('a');a.href=url;a.download=name;a.style.display='none';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function labelStatus(obj){return clean(obj?.status||'not run').split(':')[0].replaceAll('_',' ')}
+function cardHead(title,index,status){const head=el('div','agent-report-head');const left=el('div','agent-report-title');add(left,el('span','agent-num',index),el('h3','',title));const pill=el('span',`status-pill ${safeState(status)}`,status||'not run');add(head,left,pill);return head}
+function metric(label,value){const d=el('div','submetric');add(d,el('small','',label),el('strong','',value));return d}
+function itemList(items,format,max=40){const list=el('div','finding-list');items.slice(0,max).forEach((f,i)=>{const n=el('div','finding-row');const [a,b,c]=format(f,i);add(n,el('strong','',a));const right=el('span');right.textContent=b||'';if(c)right.className=`risk-tag ${c}`;n.append(right);list.append(n)});if(items.length>max)list.append(el('p','',`${items.length-max} more entries are in the exported report.`));return list}
+function detailsBlock(title,content){const d=el('details'),s=el('summary','',title);d.append(s,content);return d}
+function explain(card,text){if(text)card.append(el('p','',text));}
+function renderCoi(data){const d=data||{},c=el('article','agent-report');c.append(cardHead('Conflict of interest','01 / COI',labelStatus(d)));
+  const sub=el('div','submetric-row');add(sub,metric('VERIFIED CONFLICT',d.status==='complete'?(d.conflict_detected?'Detected':'Not found in graph'):'Undetermined'),metric('SEVERITY',d.severity||'Not available'));c.append(sub);
+  if(d.status==='complete'&&!d.conflict_detected)explain(c,'No verified conflict path was returned within the configured graph. This is not universal clearance.');
+  if(d.skipped_reason||d.reason)explain(c,d.skipped_reason||d.reason);
+  if(Array.isArray(d.conflict_path)&&d.conflict_path.length)c.append(detailsBlock('View relationship path',el('p','',d.conflict_path.join(' → '))));
+  if(d.unresolved_entities?.length)c.append(detailsBlock(`Unresolved entities (${d.unresolved_entities.length})`,itemList(d.unresolved_entities,x=>[x,'Needs verification'])));
+  if(d.findings?.length)c.append(detailsBlock(`Additional graph findings (${d.findings.length})`,itemList(d.findings,x=>[x.description||x.type||'Graph finding',x.severity||''])));
+  if(d.clause_findings?.length)c.append(detailsBlock(`Clause text findings (${d.clause_findings.length})`,itemList(d.clause_findings,x=>[x.type||'Potential conflict',x.person||x.severity||'Unverified'])));
+  return c;}
+function renderCr(data){const d=data||{},c=el('article','agent-report'),clauses=Array.isArray(d.clauses)?d.clauses:[],attempted=clauses.length,classified=clauses.filter(x=>['Seed','Low','Medium','High'].includes(x?.model?.prediction)).length;
+  c.append(cardHead('Clause risk','02 / CR',labelStatus(d)));
+  const sub=el('div','submetric-row');add(sub,metric('CLASSIFIED',`${classified} / ${attempted}`),metric('OMITTED CLAUSES',clean(d.omitted_clause_count||0)));c.append(sub);
+  if(d.reason)explain(c,d.reason);
+  explain(c,d.model_note||'LegalBERT labels are model risk signals, not calibrated probabilities. “Seed” means Baseline, not Low risk.');
+  if(clauses.length){
+    const list=el('div','finding-list');clauses.forEach(x=>{
+      const row=el('div','finding-row');const left=el('div');add(left,el('strong','',`Clause ${x.clause_id??'—'}`));if(Number.isFinite(x?.model?.model_score))left.append(el('div','',`Raw model score: ${(100*x.model.model_score).toFixed(1)}% (uncalibrated)`));
+      row.append(left);const v=x?.model?.prediction||'Unavailable';row.append(el('span',`risk-tag ${v.toLowerCase()}`,v==='Seed'?'Baseline (Seed)':v));list.append(row);
+      if(x.reason)list.append(el('p','',x.reason));
+    });c.append(detailsBlock(`Inspect ${clauses.length} attempted clauses`,list));
   }
-  return [...byOccurrence.values()].sort((a, b) =>
-    String(a.clause_id || '').localeCompare(String(b.clause_id || '')) ||
-    (Number(a.start) || 0) - (Number(b.start) || 0));
+  return c;}
+function renderCl(data){const d=data||{},c=el('article','agent-report'),findings=Array.isArray(d.findings)?d.findings:[];
+  c.append(cardHead('Confidentiality leakage','03 / CL',labelStatus(d)));
+  const sub=el('div','submetric-row');add(sub,metric('SENSITIVE SIGNALS',d.sensitive_data_detected===true?'Detected':d.sensitive_data_detected===false?'Not detected':'Unknown'),metric('FINDINGS',clean(d.total_findings??findings.length)));c.append(sub);
+  explain(c,d.risk_level?`Reported risk level: ${d.risk_level}. Values are redacted in the API response.`:'Returned findings contain redacted values. A clean scan is not a guarantee.');
+  if(d.reason)explain(c,d.reason);
+  if(findings.length)c.append(detailsBlock(`View ${findings.length} reported findings`,itemList(findings,f=>[f.type||f.entity_type||'Sensitive finding',[f.sensitivity,f.clause_id?`Clause ${f.clause_id}`:''].filter(Boolean).join(' · ')])));
+  return c;}
+function renderLe(data,status){const d=data||{},c=el('article','agent-report');c.append(cardHead('Litigation exposure','04 / LE',status||((data&&d.litigation_probability!==undefined)?'complete':'skipped')));
+  const score=Number(d.litigation_probability);
+  if(data&&Number.isFinite(score)){
+    const gauge=el('div','exposure-gauge'),ring=el('div','gauge-ring'),pct=Math.max(0,Math.min(100,score*100));ring.style.setProperty('--score',`${pct}%`);ring.append(el('strong','',`${pct.toFixed(1)}%`));const copy=el('div','gauge-copy');add(copy,el('strong','',`Model band: ${d.risk_level||'not supplied'}`),el('p','', 'Synthetic-trained model output, not a calibrated estimate of actual litigation likelihood.'));gauge.append(ring,copy);c.append(gauge);
+    if(d.shap_explanation&&typeof d.shap_explanation==='object'){
+      const entries=Object.entries(d.shap_explanation).filter(([k,v])=>Number.isFinite(Number(v))).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+      if(entries.length)c.append(detailsBlock('Inspect model contribution values',itemList(entries,([k,v])=>[k.replaceAll('_',' '),Number(v).toFixed(4)])));
+    }
+  }else explain(c,clean(status||'Not run')+'. A completed COI check and independently measured template deviation are required for the coordinated review.');
+  return c;}
+function createChart(cr){const root=el('div'),clauses=cr?.clauses||[],valid=clauses.map(x=>x?.model?.prediction).filter(x=>['Seed','Low','Medium','High'].includes(x));if(!valid.length){root.append(el('p','chart-empty','No clause classifications available for a distribution chart.'));return root;}
+  ['High','Medium','Low','Seed'].forEach(name=>{const count=valid.filter(x=>x===name).length,row=el('div','chart-row'),track=el('div','chart-track'),fill=el('div',`chart-fill ${name.toLowerCase()}`);fill.style.width=`${100*count/valid.length}%`;track.append(fill);add(row,el('span','',name==='Seed'?'Baseline':name),track,el('b','',count));root.append(row);});return root;}
+function summaryCell(code,value,desc){const c=el('div','summary-cell');add(c,el('span','small-index',code),el('strong','',value),el('span','',desc));return c;}
+function resultsInit(){const root=$('#result-content');if(!root)return;const empty=$('#empty-results');let bundle=null;
+  try{bundle=JSON.parse(sessionStorage.getItem(SUMMARY_KEY)||'null')}catch{}
+  if(!bundle?.result||!bundle.result.coi){empty.hidden=false;root.hidden=true;$('#download-result').disabled=true;return;}
+  const d=bundle.result;root.hidden=false;empty.hidden=true;
+  $('#report-id').textContent=`REVIEW / ${d.doc_id||'UNTITLED'}`;
+  $('#report-subtitle').textContent=d.status==='complete'?'All four agent steps returned completed results. Findings still require human interpretation.':'One or more checks did not complete. Review unavailable signals below before making a decision.';
+  $('#report-state').textContent=d.status==='complete'?'All four agents completed':'Partial or incomplete coverage';
+  const summary=$('#result-summary-grid');summary.replaceChildren();
+  const cr=d.cr||{},cl=d.cl||{},coi=d.coi||{},le=d.le;
+  const classifications=(cr.clauses||[]).filter(x=>['Seed','Low','Medium','High'].includes(x?.model?.prediction));
+  add(summary,summaryCell('01 / COI',coi.status==='complete'?(coi.conflict_detected?'Conflict found':'No path found'):'Incomplete','Within configured graph only'),summaryCell('02 / CR',String(classifications.length),'Classified clauses'),summaryCell('03 / CL',String(cl.total_findings??cl.findings?.length??'—'),'Sensitive findings'),summaryCell('04 / LE',le&&Number.isFinite(Number(le.litigation_probability))?`${(le.litigation_probability*100).toFixed(1)}%`:'Not run','Synthetic model signal · uncalibrated'));
+  const details=$('#report-details');details.replaceChildren(renderCoi(coi),renderCr(cr),renderCl(cl),renderLe(le,d.le_status));
+  const chart=$('#classification-chart');chart.replaceChildren(createChart(cr));
+  const reasons=$('#review-reasons');reasons.replaceChildren();const list=d.decision?.reasons||['Every result requires human assessment.'];list.forEach(reason=>reasons.append(el('li','',reason)));
+  (d.decision?.limitations||[]).forEach(reason=>reasons.append(el('li','',reason)));
+  $('#download-result').addEventListener('click',()=>downloadableJson(d,`${d.doc_id||'lexguard'}-report.json`));
+  $('#clear-report').addEventListener('click',()=>{sessionStorage.removeItem(SUMMARY_KEY);window.location.reload()});
 }
-function maskEvidence(type, value) {
-  const text = String(value || '').trim();
-  if (!text) return 'Not available';
-  if (type === 'EMAIL' && text.includes('@')) return `${text.split('@')[0].slice(0, 1)}***@${text.split('@')[1]}`;
-  if (['PHONE_NUMBER', 'AADHAAR_NUMBER', 'PAN_NUMBER', 'BANK_ACCOUNT', 'IBAN', 'CREDIT_CARD', 'POSTAL_CODE'].includes(type)) {
-    const digits = text.replace(/\D/g, '');
-    return digits.length <= 4 ? '*'.repeat(digits.length) : `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`;
-  }
-  if (type === 'IP_ADDRESS') return text.replace(/\d+(?=\.\d+\.\d+\.\d+$)/, '***').replace(/\d+(?=\.\d+\.\d+$)/, '***').replace(/\d+(?=\.\d+$)/, '***');
-  if (type.startsWith('CONFIDENTIAL_')) return `[${type}]`;
-  if (['PERSON', 'ORG', 'GPE', 'LOC', 'ADDRESS'].includes(type)) {
-    return text.replace(/[A-Za-z0-9]+/g, (word) => word.length <= 1 ? '*' : word.length === 2 ? `${word[0]}*` : `${word[0]}${'*'.repeat(word.length - 2)}${word.at(-1)}`);
-  }
-  return '***';
+function renderToolResult(kind,d){const target=$('#tool-output-content');target.replaceChildren();
+  if(kind==='conflicts')target.append(renderCoi(d));
+  if(kind==='clauses'){target.append(renderCr(d));const viz=el('div','mini-panel');add(viz,el('h3','','Classification distribution'),createChart(d));target.append(viz);}
+  if(kind==='confidentiality')target.append(renderCl(d));
+  if(kind==='litigation'){target.append(renderCoi(d.coi));target.append(renderLe(d.litigation,d.litigation?'complete':d.status));}
+  const pre=el('pre','raw-output',JSON.stringify(d,null,2));target.append(detailsBlock('View raw agent response',pre));
 }
-function renderDataTable(headers, rows) {
-  const wrapper = node('div', 'data-table-wrap');
-  const table = node('table', 'data-table');
-  const thead = document.createElement('thead');
-  const heading = document.createElement('tr');
-  headers.forEach((title) => heading.append(node('th', '', title)));
-  thead.append(heading);
-  const tbody = document.createElement('tbody');
-  rows.forEach((row) => {
-    const tr = document.createElement('tr');
-    row.forEach((value) => tr.append(node('td', '', value)));
-    tbody.append(tr);
+function toolInit(){const form=$('#tool-form');if(!form)return;const kind=$('[data-tool]')?.dataset.tool;let last=null,busy=false;
+  if(['clauses','confidentiality'].includes(kind)){setupExtraction('#tool-file','[name="contract_text"]');$('#load-example')?.addEventListener('click',()=>setExample(form));}
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();if(busy||fileLoading)return;clearError('#tool-error');
+    const invalid=validateFields(form);if(invalid){showError('#tool-error',invalid);return}
+    const entitySet={doc_id:`specialist-${Date.now()}`,client_entity:fieldValue(form,'client_entity'),counterparty_entity:fieldValue(form,'counterparty_entity'),contract_entities:filesFromText(fieldValue(form,'contract_entities')),additional_entities:[]};
+    let path,body;
+    if(kind==='conflicts'){path='/api/coi/check';body=entitySet;}
+    if(kind==='clauses'){path='/api/cr/analyze';body={contract_text:fieldValue(form,'contract_text')};}
+    if(kind==='confidentiality'){path='/api/cl/analyze';body={doc_id:`privacy-${Date.now()}`,contract_text:fieldValue(form,'contract_text')};}
+    if(kind==='litigation'){path='/api/risk/assess';body={...entitySet,litigation_entities:modelFeatures(form),clause_deviation_score:Number(fieldValue(form,'deviation'))/100};}
+    const submit=$('#tool-submit');busy=true;setLoading(submit,true,`Run ${kind} analysis`);
+    try{const data=await postJson(path,body);last=data;renderToolResult(kind,data);$('#tool-output').hidden=false;$('#tool-output').scrollIntoView({behavior:'smooth',block:'start'});}
+    catch(err){showError('#tool-error',err.message||'The request failed.');}
+    finally{busy=false;setLoading(submit,false,`Run ${kind} analysis →`)}
   });
-  table.append(thead, tbody);
-  wrapper.append(table);
-  return wrapper;
+  $('#tool-export')?.addEventListener('click',()=>{if(last)downloadableJson(last,`lexguard-${kind}-response.json`)});
 }
-function combinedAgentScore(report) {
-  const scores = [];
-  const bandScore = { baseline: 0, seed: 0, low: 25, medium: 50, high: 75, critical: 100 };
-  const craScores = (report.clauses || []).map((item) => bandScore[String(item.cra?.model?.prediction || '').toLowerCase()]).filter(Number.isFinite);
-  if (craScores.length) scores.push(Math.max(...craScores)); // One CRA score: highest predicted ML risk band.
-
-  const clScore = Number(report.confidentiality?.risk_score);
-  if (Number.isFinite(clScore)) scores.push(Math.max(0, Math.min(100, clScore))); // Use CL's own score directly.
-
-  const graph = report.coi?.graph_result || {};
-  const coiBands = { none: 0, low: 35, medium: 65, high: 100 };
-  const severity = String(graph.severity || '').toLowerCase();
-  if (graph.conflict_detected === true && Number.isFinite(coiBands[severity])) scores.push(coiBands[severity]);
-  else if (graph.status === 'complete' && graph.conflict_detected === false) scores.push(0);
-
-  const le = report.litigation_exposure || {};
-  const probability = Number(le.litigation_probability);
-  if (le.status === 'complete' && Number.isFinite(probability)) scores.push(Math.max(0, Math.min(100, probability * 100)));
-  return scores.length ? { score: Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length), count: scores.length } : { score: null, count: 0 };
-}
-function section(code, title, subtitle) {
-  const card = node('section', 'agent-card');
-  const heading = node('div', 'agent-title');
-  heading.append(node('span', 'agent-icon', code), node('strong', '', title), node('span', 'sub', subtitle || ''));
-  card.append(heading);
-  const body = node('div', 'agent-body'); card.append(body);
-  return { card, body };
-}
-function addPairs(container, pairs) {
-  const row = node('div', 'mini-stats');
-  for (const [name, value] of pairs) row.append(node('span', '', `${name}: ${label(value)}`));
-  container.append(row);
-}
-function showOverallSummary(summary) {
-  const dialog = $('#overall-summary-dialog');
-  const content = $('#overall-summary-content');
-  content.replaceChildren();
-  if (!summary || summary.status !== 'complete') {
-    content.append(node('p', 'result-note', summary?.message || 'The overall LLM summary is unavailable.'));
-  } else {
-    content.append(node('p', 'summary-lead', summary.overall_assessment || 'No overall assessment was returned.'));
-    for (const [title, value] of [['CRA model and clause analysis', summary.cra_summary], ['CL confidentiality findings', summary.cl_summary]]) {
-      const block = node('section', 'summary-block');
-      block.append(node('h3', '', title), node('p', '', value || 'No summary returned.'));
-      content.append(block);
-    }
-    for (const [title, items] of [['Key risks', summary.key_risks], ['Review priorities', summary.review_priorities]]) {
-      const block = node('section', 'summary-block');
-      block.append(node('h3', '', title));
-      if (Array.isArray(items) && items.length) {
-        const list = node('ul', 'summary-list');
-        items.forEach((item) => list.append(node('li', '', String(item))));
-        block.append(list);
-      } else block.append(node('p', '', 'None reported.'));
-      content.append(block);
-    }
-    content.append(node('p', 'summary-limit', summary.limitations || 'Automated summary; review the underlying agent results.'));
-  }
-  const source = summary?.source_inputs || {};
-  const craOutputs = (source.cra_clause_results || [])
-    .filter((item) => item.llm_output && Object.values(item.llm_output).some((value) => value !== null && value !== undefined))
-    .map((item) => ({ clause_id: item.clause_id, ...item.llm_output }));
-  const sourceBlocks = [
-    ['CRA clause LLM output (verbatim)', craOutputs],
-    ['CL output sent to the overall LLM (verbatim)', {
-      skipped_clauses: source.skipped_clauses || [],
-      confidentiality: source.confidentiality || {},
-    }],
-  ];
-  for (const [title, value] of sourceBlocks) {
-    const block = node('section', 'summary-block');
-    block.append(node('h3', '', title));
-    block.append(node('pre', 'summary-json', JSON.stringify(value, null, 2)));
-    content.append(block);
-  }
-  dialog.showModal();
-}
-$('#close-summary').addEventListener('click', () => $('#overall-summary-dialog').close());
-function renderLLMAnalysis(clauses) {
-  const list = node('div', 'clause-list');
-  clauses.forEach((item) => {
-    const risk = item.cra || {};
-    const analysis = risk.analysis || {};
-    const card = node('article', 'clause-item');
-    const header = node('div', 'clause-head');
-    header.append(node('span', 'clause-id', `Clause ${label(item.clause_id, item.clause_number || '?')}`));
-    for (const trigger of item.llm_trigger || []) header.append(node('span', 'risk-badge risk-baseline', trigger));
-    if (analysis.assessed_risk) header.append(node('span', `risk-badge ${riskClass(analysis.assessed_risk)}`, `LLM ${analysis.assessed_risk}`));
-    card.append(header);
-    const reason = analysis.risk_reasoning || analysis.summary || (risk.llm_analysis_skipped ? 'LLM analysis was not run for this clause.' : item.cra_error);
-    if (reason) card.append(node('p', 'clause-reason', reason));
-    if (analysis.human_review_required) card.append(node('p', 'clause-reason', 'Human review required'));
-    if (analysis.summary && analysis.risk_reasoning && analysis.summary !== analysis.risk_reasoning) card.append(node('p', 'result-note', analysis.summary));
-    const clauseText = item.text || '';
-    if (clauseText) {
-      const text = node('p', 'clause-text', clauseText);
-      if (clauseText.length > 280) { text.textContent = `${clauseText.slice(0, 280)}…`; text.dataset.full = clauseText; text.dataset.short = text.textContent; }
-      card.append(text);
-      if (clauseText.length > 280) {
-        const toggle = node('button', 'expand-link', 'Show full clause'); toggle.type = 'button';
-        toggle.addEventListener('click', () => { const expanded = toggle.dataset.expanded === 'true'; text.textContent = expanded ? text.dataset.short : text.dataset.full; toggle.textContent = expanded ? 'Show full clause' : 'Show less'; toggle.dataset.expanded = String(!expanded); });
-        card.append(toggle);
-      }
-    }
-    list.append(card);
-  });
-  return list;
-}
-function renderCOI(report) {
-  const coi = report.coi || {};
-  const graph = coi.graph_result || {};
-  const { card, body } = section('COI', 'Conflict of interest', label(graph.status || coi.status, 'Unknown'));
-  const parties = coi.party_roles || {};
-  const partyPairs = Object.entries(parties)
-    .filter(([, value]) => value !== null && value !== undefined && value !== '' && (!Array.isArray(value) || value.length))
-    .map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : value]);
-  if (partyPairs.length) addPairs(body, partyPairs);
-  addPairs(body, [
-    ['Graph status', label(graph.status, 'Unknown')],
-    ['Severity', label(graph.severity, 'Unknown')],
-    ['Conflict', graph.conflict_detected === true ? 'Yes' : graph.conflict_detected === false ? 'No' : 'Unknown'],
-  ]);
-  if (graph.note || graph.skipped_reason || coi.graph_error) {
-    body.append(node('p', 'result-note', graph.note || graph.skipped_reason || `Graph lookup error: ${coi.graph_error}`));
-  }
-  const clauseFindings = coi.clause_findings || [];
-  if (clauseFindings.length) {
-    body.append(node('h4', 'summary-table-title', 'Clause evidence (not graph verified)'));
-    body.append(renderDataTable(
-      ['Finding', 'Person', 'Severity', 'Evidence'],
-      clauseFindings.map((finding) => [
-        label(finding.type, 'Potential conflict').replaceAll('_', ' '),
-        label(finding.person),
-        label(finding.severity),
-        label(finding.evidence || finding.relationship),
-      ]),
-    ));
-  }
-  const entities = (coi.entities || []).map((entity) => entity.name).filter(Boolean);
-  if (entities.length) body.append(node('p', 'result-note', `Entities searched: ${[...new Set(entities)].join(', ')}`));
-  if (!partyPairs.length && !clauseFindings.length && !entities.length && !graph.note && !graph.skipped_reason && !coi.graph_error) {
-    body.append(node('p', 'result-note', 'No additional COI details were returned.'));
-  }
-  return card;
-}
-function renderLE(report) {
-  const le = report.litigation_exposure || { status: 'not_requested' };
-  const { card, body } = section('LE', 'Litigation exposure', label(le.risk_level, le.status === 'complete' ? 'Complete' : le.status));
-  if (le.status === 'complete') {
-    const probability = le.litigation_probability === null || le.litigation_probability === undefined
-      ? Number.NaN : Number(le.litigation_probability);
-    addPairs(body, [
-      ['Risk level', label(le.risk_level)],
-      ['Litigation probability', Number.isFinite(probability) ? `${(probability * 100).toFixed(1)}%` : 'Unavailable'],
-      ['COI conflict flag', le.conflict_flag === 1 || le.conflict_flag === true ? '1 (Yes)' : le.conflict_flag === 0 || le.conflict_flag === false ? '0 (No)' : 'Unknown'],
-    ]);
-    if (le.conflict_flag_source) body.append(node('p', 'result-note', `Conflict flag source: ${le.conflict_flag_source}`));
-    const contributions = Object.entries(le.shap_explanation || {})
-      .filter(([, value]) => Number.isFinite(Number(value)))
-      .sort((a, b) => Math.abs(Number(b[1])) - Math.abs(Number(a[1])))
-      .slice(0, 3);
-    if (contributions.length) body.append(node('p', 'result-note', `Top model contributions: ${contributions.map(([name, value]) => `${name} ${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(3)}`).join(' | ')}`));
-  } else if (le.status === 'skipped' || le.status === 'unavailable') {
-    body.append(node('p', 'result-note', le.reason || `LE analysis ${le.status}.`));
-    if (le.conflict_flag !== undefined) body.append(node('p', 'result-note', `COI conflict flag: ${le.conflict_flag} (${label(le.conflict_flag_source, 'source unavailable')}).`));
-  } else {
-    body.append(node('p', 'result-note', le.status === 'not_requested' ? 'LE prediction was not requested for this contract.' : 'No LE prediction was returned.'));
-  }
-  return card;
-}
-function render(report) {
-  const root = $('#result-content');
-  root.replaceChildren();
-  const overallSummary = report.overall_summary || {
-    status: 'unavailable',
-    message: 'The analysis response did not include agent summaries.',
-  };
-  const card = node('section', 'overall-summary-only');
-  const header = node('div', 'overall-summary-heading');
-  header.append(
-    node('h2', '', 'CRA and CL summaries'),
-    node('span', `status-pill ${overallSummary.status === 'complete' ? 'ok' : ''}`, label(overallSummary.status, 'unavailable')),
-  );
-  card.append(header);
-  if (!overallSummary.source_inputs && !report.confidentiality) {
-    card.append(node('p', 'overall-summary-text', overallSummary.message || 'The overall summary is unavailable.'));
-  } else {
-    const inputs = overallSummary.source_inputs || {};
-    const craRows = inputs.cra_clause_results || [];
-    const craBlock = node('section', 'overall-summary-block');
-    craBlock.append(node('h3', '', 'CRA clause LLM output'));
-    const craOutputRows = craRows.filter((item) => item.llm_output && Object.values(item.llm_output).some((value) => value !== null && value !== undefined));
-    if (craOutputRows.length) {
-      craOutputRows.forEach((item) => {
-        const clause = node('article', 'summary-clause');
-        clause.append(node('h4', '', `Clause ${label(item.clause_id)}`));
-        for (const field of ['assessed_risk', 'agreement_with_model', 'summary', 'risk_reasoning']) {
-          const value = item.llm_output[field];
-          if (value !== null && value !== undefined && value !== '') {
-            const line = node('p', 'summary-clause-field');
-            line.append(node('strong', '', `${field}: `), document.createTextNode(String(value)));
-            clause.append(line);
-          }
-        }
-        craBlock.append(clause);
-      });
-    } else craBlock.append(node('p', '', 'No CRA clause LLM output was returned.'));
-    card.append(craBlock);
-
-    const cl = inputs.confidentiality || report.confidentiality || {};
-    const clFindings = uniqueFindingsByOccurrence(cl.findings || []);
-    const sensitivity = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, CONTEXT_DEPENDENT: 0 };
-    clFindings.forEach((finding) => {
-      const level = String(finding.sensitivity || 'LOW').toUpperCase();
-      if (sensitivity[level] !== undefined) sensitivity[level] += 1;
-    });
-    const categories = cl.summary || {};
-    const activityCount = (cl.processing_activity || []).length;
-    const clText = [
-      `CL risk: ${label(cl.risk_level, 'Unknown')} (${label(cl.risk_score, 'N/A')}/100).`,
-    ].join(' ');
-    const clBlock = node('section', 'overall-summary-block');
-    clBlock.append(node('h3', '', 'CL confidentiality summary'), node('p', '', clText));
-    clBlock.append(node('p', 'summary-cl-counts', `Sensitivity counts: Critical ${sensitivity.CRITICAL} | High ${sensitivity.HIGH} | Medium ${sensitivity.MEDIUM} | Low ${sensitivity.LOW}`));
-    clBlock.append(node('p', '', `Categories: Personal data ${label(categories.personal_data, 0)} | Sensitive personal data ${label(categories.sensitive_personal_data, 0)} | Business confidential ${label(categories.business_confidential, 0)}.`));
-    clBlock.append(node('p', 'summary-cl-context', `${sensitivity.CONTEXT_DEPENDENT} context-dependent NER match(es); these alone do not establish a leak. Processing activities: ${activityCount}; handling context only, not proof of a leak.`));
-    if (clFindings.length) {
-      const rows = clFindings.map((finding) => {
-        const lineNumber = finding.line_number ?? finding.line_no ?? finding.line;
-        const clauseNumber = finding.clause_id ?? finding.clause_no ?? finding.clause_number;
-        const hasChars = finding.start !== null && finding.start !== undefined
-          && finding.end !== null && finding.end !== undefined
-          && Number.isFinite(Number(finding.start)) && Number.isFinite(Number(finding.end));
-        const location = [
-          lineNumber !== undefined && lineNumber !== null ? `Line ${lineNumber}` : '',
-          finding.section || '',
-          clauseNumber ? `Clause ${clauseNumber}` : '',
-          hasChars ? `Chars ${finding.start}-${finding.end}` : '',
-        ].filter(Boolean).join(' | ') || 'Location unavailable';
-        return [
-          label(finding.type, 'Finding'),
-          label(finding.sensitivity, 'LOW').replaceAll('_', ' '),
-          label(finding.category, 'Unclassified').replaceAll('_', ' '),
-          location,
-          maskEvidence(label(finding.type, ''), finding.value),
-        ];
-      });
-      clBlock.append(node('h4', 'summary-table-title', `Findings by clause or line (${clFindings.length})`));
-      clBlock.append(renderDataTable(['Data type', 'Sensitivity', 'Category', 'Clause / line number', 'Evidence (masked)'], rows));
-    } else clBlock.append(node('p', '', 'No CL findings were reported.'));
-    card.append(clBlock);
-  }
-  root.append(card);
-  root.append(renderCOI(report), renderLE(report));
-  showState('result');
-}
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const error = $('#form-error'); error.hidden = true; error.textContent = '';
-  const client = $('#client').value.trim();
-  const counterparty = $('#counterparty').value.trim();
-  const additional = $('#additional').value.split(',').map((name) => name.trim()).filter(Boolean);
-  if (Boolean(client) !== Boolean(counterparty)) { error.textContent = 'Enter both the client and counterparty, or leave both blank.'; error.hidden = false; return; }
-  if (client && counterparty && normalizePartyName(client) === normalizePartyName(counterparty)) { error.textContent = 'Client and counterparty must be different companies or people.'; error.hidden = false; return; }
-  if ((client || counterparty || additional.length) && !client && !additional.length) { error.textContent = 'Add both primary parties or at least one additional party name.'; error.hidden = false; return; }
-  const request = { filename: $('#filename').value.trim() || 'contract.txt', contract_text: textBox.value, include_litigation_exposure: leToggle.checked, entities: {}, clause_deviation_score: null };
-  if (client && counterparty || additional.length) request.parties = { ...(client ? { client, counterparty } : {}), additional };
-  if (leToggle.checked) {
-    const selectedFlag = (field) => {
-      const value = document.querySelector(`.choice-group[data-field="${field}"]`).dataset.selected || 'unknown';
-      return value === 'unknown' ? null : value === '1';
-    };
-    const numberValue = (id) => { const value = $(`#${id}`).value; return value === '' ? null : Number(value); };
-    const intakeForm = {
-      deal_size: numberValue('deal-size'),
-      liability_cap: selectedFlag('liability_cap'),
-      auto_renewal: selectedFlag('auto_renewal'),
-      jurisdiction_risk: numberValue('jurisdiction-risk'),
-      indemnification_clause: selectedFlag('indemnification_clause'),
-      dispute_history: selectedFlag('dispute_history'),
-      governing_law_clarity: numberValue('governing-clarity'),
-      clause_deviation_score: numberValue('deviation'),
-    };
-    for (const [id, min, max, title] of [['deal-size', 50000, 5000000, 'Deal size'], ['jurisdiction-risk', 1, 10, 'Jurisdiction risk'], ['governing-clarity', 1, 5, 'Governing law clarity'], ['deviation', 0, 1, 'Clause deviation score']]) {
-      const field = $(`#${id}`);
-      if (field.value !== '' && (numberValue(id) < min || numberValue(id) > max || !Number.isFinite(numberValue(id)))) {
-        error.textContent = `${title} must be between ${min} and ${max}.`; error.hidden = false; return;
-      }
-    }
-    if (['jurisdiction-risk', 'governing-clarity'].some((id) => $(`#${id}`).value !== '' && !Number.isInteger(numberValue(id)))) {
-      error.textContent = 'Jurisdiction risk and governing law clarity must be whole numbers.'; error.hidden = false; return;
-    }
-    try {
-      const intakeResponse = await fetch('/build-le-intake', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(intakeForm) });
-      const intake = await intakeResponse.json();
-      if (!intakeResponse.ok) throw new Error(typeof intake.detail === 'string' ? intake.detail : JSON.stringify(intake.detail || intake));
-      request.entities = intake.entities;
-      request.clause_deviation_score = intake.clause_deviation_score;
-    } catch (e) {
-      error.textContent = `Could not build the LE intake: ${e.message}`; error.hidden = false; return;
-    }
-  }
-  button.disabled = true; button.querySelector('span').textContent = 'Analyzing…';
-  try {
-    if (!modelsReady) await ensureModelsReady();
-    const response = await fetch('/analyze-contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || data));
-    render(data);
-  } catch (e) {
-    const root = $('#result-content'); root.replaceChildren();
-    const errorBox = node('div', 'error-view'); errorBox.append(node('h2', '', 'Analysis could not be completed'), node('p', '', e.message || 'Check that the API server is running and try again.')); root.append(errorBox); showState('result');
-  } finally { button.disabled = false; button.querySelector('span').textContent = 'Analyze contract'; }
+document.addEventListener('DOMContentLoaded',()=>{
+  themeInit();reviewInit();toolInit();resultsInit();
+  fetch('/initialize',{method:'POST'}).catch(()=>{}).finally(systemStatus);
+  systemStatus();setInterval(systemStatus,5000);
 });

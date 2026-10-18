@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LexGuard | Test dashboard</title>
+  <link rel="stylesheet" href="/static/advanced.css">
+  <script src="/static/advanced.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand"><strong>LexGuard</strong><span>Test dashboard</span></div>
+      <div class="topbar-right"><span id="system-state" class="system-state" role="status">Checking services…</span><a href="/docs" target="_blank" rel="noopener noreferrer">All endpoints in Swagger ↗</a></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel" aria-labelledby="status-title">
+      <div class="panel-heading"><div><h1 id="status-title">Agent status</h1><p>Current service readiness</p></div><button id="refresh-status" type="button" class="secondary-button">Refresh</button></div>
+      <div class="status-grid">
+        <div class="status-item"><span class="agent-code">COI</span><span>Conflict of interest</span><span id="status-coi" class="service-pill">Checking</span></div>
+        <div class="status-item"><span class="agent-code">CR</span><span>Contract risk</span><span id="status-cr" class="service-pill">Checking</span></div>
+        <div class="status-item"><span class="agent-code">CL</span><span>Confidentiality leakage</span><span id="status-cl" class="service-pill">Checking</span></div>
+        <div class="status-item"><span class="agent-code">LE</span><span>Litigation exposure</span><span id="status-le" class="service-pill">Checking</span></div>
+      </div>
+      <p id="status-extra" class="meta-line"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="request-title">
+      <div class="panel-heading"><div><h2 id="request-title">Send a JSON request</h2><p>Choose an endpoint, edit the sample, and send it.</p></div></div>
+      <form id="request-form">
+        <div class="request-controls">
+          <div class="field"><label for="endpoint">Endpoint</label><select id="endpoint">
+            <option value="/api/analyze">POST /api/analyze — combined review</option>
+            <option value="/api/coi/check">POST /api/coi/check — COI</option>
+            <option value="/api/cr/analyze">POST /api/cr/analyze — CR</option>
+            <option value="/api/cl/analyze">POST /api/cl/analyze — CL</option>
+            <option value="/api/le/predict">POST /api/le/predict — isolated LE</option>
+            <option value="/api/risk/assess">POST /api/risk/assess — COI + LE</option>
+          </select></div>
+          <button id="load-sample" type="button" class="secondary-button">Reset sample JSON</button>
+        </div>
+        <p id="endpoint-note" class="hint"></p>
+        <div class="field"><label for="request-json">JSON body</label><textarea id="request-json" class="json-editor" spellcheck="false" aria-describedby="json-help" required></textarea><small id="json-help">The selected endpoint receives this JSON exactly as shown.</small></div>
+        <div class="upload-tool"><label id="file-label" for="file">Load contract file into <code>contract_text</code></label><input id="file" type="file" accept=".txt,.pdf,.docx"><small id="file-status" role="status">TXT, PDF, or DOCX up to 5 MB.</small></div>
+        <div class="form-actions"><button id="submit" type="submit" class="primary-button">Send request</button><span>Standalone LE accepts caller-supplied graph values; combined review uses the current COI result.</span></div>
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <section class="panel results-section" id="results" aria-labelledby="results-title" hidden>
+      <div class="panel-heading"><div><h2 id="results-title">Response</h2><p id="result-meta"></p></div><button id="download" type="button" class="secondary-button">Download JSON</button></div>
+      <div id="result-summary" class="response-summary"></div>
+      <div id="visual-results"></div>
+      <details class="raw-details"><summary>View raw JSON</summary><pre id="raw-json" class="response-json"></pre></details>
+    </section>
+  </main>
+</body>
+</html>
