@@ -102,6 +102,9 @@ class LexGraph:
             tx.run("MERGE (s:COISource {doc_id:$id}) SET s.version=$version, s.filename=$filename, "
                    "s.doc_type=$doc_type, s.updated_at=datetime()",
                    id=doc_id, version=version, filename=doc.get("filename", ""), doc_type=doc.get("type", "")).consume()
+            prior_keys = [record["key"] for record in tx.run(
+                "MATCH (s:COISource {doc_id:$id})-[:CONTAINS_CLAUSE]->(c:COIClause)"
+                "<-[:EXTRACTED_FROM]-(n:COIEntity) RETURN DISTINCT n.key AS key", id=doc_id)]
             tx.run("MATCH ()-[r:COI_RELATES_TO {doc_id:$id}]->() DELETE r", id=doc_id).consume()
             tx.run("MATCH (s:COISource {doc_id:$id})-[:CONTAINS_CLAUSE]->(c:COIClause) DETACH DELETE c", id=doc_id).consume()
             for row in rows:
@@ -116,6 +119,10 @@ class LexGraph:
                        "MERGE (a)-[e:COI_RELATES_TO {doc_id:$id, clause_id:$cid, type:r.type}]->(b) "
                        "SET e.verified=r.verified, e.evidence=r.evidence, e.valid_from=r.valid_from, e.valid_until=r.valid_until",
                        rels=row["relationships"], id=doc_id, cid=row["clause_id"]).consume()
+            tx.run("MATCH (n:COIEntity) WHERE n.key IN $keys "
+                   "AND NOT EXISTS { MATCH (n)-[:EXTRACTED_FROM]->(:COIClause) } "
+                   "AND NOT EXISTS { MATCH (n)-[:COI_RELATES_TO]-() } DELETE n",
+                   keys=prior_keys).consume()
             return {"status": "complete", "doc_id": doc_id, "version": version, "clauses": len(rows)}
         with self.driver.session(database=self.database) as session:
             return session.execute_write(write)

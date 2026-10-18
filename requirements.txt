@@ -4,6 +4,7 @@ uvicorn[standard]>=0.34,<1
 pydantic>=2.7,<3
 python-dotenv>=1,<2
 neo4j>=5.20,<7
+python-multipart>=0.0.9,<1
 
 # Contract Risk Analysis (CRA) and retrieval
 torch>=2.2,<3

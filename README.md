@@ -72,7 +72,7 @@ Start the API and frontend from the project root:
 python -m uvicorn api:app --reload
 ```
 
-Open `http://127.0.0.1:8000` for the browser UI or `http://127.0.0.1:8000/docs` for Swagger. Models initialize in the background when the UI opens. The readiness panel and health checkpoints show each agent's state. Keep one Uvicorn process running; each worker would load its own model copies.
+Open `http://127.0.0.1:8000` for the Atelier browser UI or `http://127.0.0.1:8000/docs` for Swagger. The UI has a guided review at `/review`, tab-local results at `/results`, specialist tools under `/tools/`, and a JSON developer console at `/advanced`. Models initialize in the background when the UI opens. The readiness panel and health checkpoints show each agent's state. Keep one Uvicorn process running; each worker would load its own model copies.
 
 ## API and analysis inputs
 
@@ -81,12 +81,13 @@ Open `http://127.0.0.1:8000` for the browser UI or `http://127.0.0.1:8000/docs` 
 - `POST /initialize` starts model initialization; `GET /initialization-status` reports progress.
 - `POST /agent-health-check` and `GET /agent-health` run and report agent health checks; COI's check needs Neo4j.
 - `GET /health` checks the API process.
+- `/api/status`, `/api/extract`, `/api/analyze`, and the `/api/{coi,cr,cl,le,risk}/...` routes support the integrated browser pages. File extraction previews text; running an analysis ingests that text and updates the KG. The browser holds its latest review report in tab-local session storage.
 
 Swagger accepts plaintext in `contract_text`, optional party hints in `parties.client`, `parties.counterparty`, and `parties.additional`, and optional LE fields. See [`sample_json/example_contract_intake.json`](sample_json/example_contract_intake.json). COI searches supplied names alongside NER entities. Both primary party names should resolve to graph entities for a meaningful relationship search.
 
 The browser output shows the CRA clause LLM fields, CL confidentiality score/counts/findings, and COI/LE result cards. LE features are manually entered; the COI conflict flag is managed by the pipeline. When COI does not provide a conflict result, the current LE pipeline uses a documented fallback value of `0`; that fallback means no positive conflict result was available, not that the graph verified no conflict.
 
-Supported contract ingestion includes UTF-8 TXT, text-based PDF, and DOCX. Scanned PDFs require OCR before ingestion. Contract-level analysis is in-memory and does not persist submitted contracts to Neo4j.
+Supported contract ingestion includes UTF-8 TXT, text-based PDF, and DOCX. Scanned PDFs require OCR before ingestion. Every successful ingestion through the API or CLI updates Neo4j with a source document, segmented clauses, detected people/companies/locations, and explicitly stated relationships. Extracted relationships carry clause text as evidence and remain unverified. The response metadata includes KG entity and relationship counts. Neo4j must be available for ingestion to succeed; reingesting identical bytes replaces that document's graph evidence.
 
 ## Models and GitHub artifacts
 

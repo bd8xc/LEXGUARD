@@ -46,7 +46,13 @@ This package adapts the supplied ingestion pipeline's in-memory TXT/PDF/DOCX
 extractor and legal clause splitter. `ingest_contract_bytes` is suitable for
 an upload handler; `ingest_contract_file` is for local files. Both return the
 extracted plaintext, segmented clause/table units, a content-derived contract
-ID, and document counts. They do not write to Neo4j or run analysis agents.
+ID, and document counts. Both also update Neo4j with the source, clauses,
+named entities, and relationships explicitly stated between those entities.
+The `metadata.graph_update` field reports the number of entities and edges.
+Graph writes are required for successful ingestion and are idempotent by
+content-derived contract ID. Extracted relationship edges are unverified and
+retain their clause evidence; names mentioned together without a stated
+relationship are linked only through their source clause.
 
 From the project root, inspect ingestion of a local document with:
 
@@ -88,8 +94,8 @@ Neo4j. If `parties` is omitted, COI uses roles detected from the contract.
 CRA analyzes each segmented unit with at least five words. CL scans the complete
 set of units once, and COI scans the complete extracted text once. Litigation
 Exposure is optional via `--with-le`. The contract-level command prints a
-summary and clause-level CRA signals; it does not persist the report or write
-new facts to Neo4j.
+summary and clause-level CRA signals. Ingestion persists source-linked KG facts
+before analysis; it does not persist the analysis report.
 
 Supported inputs are UTF-8 TXT, text-based PDF, and DOCX, up to 5 MB, 100 PDF
 pages, and 120,000 extracted characters. Scanned PDFs need OCR before use.

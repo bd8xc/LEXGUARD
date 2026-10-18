@@ -27,6 +27,10 @@ def _ingest_contract(file_path: str) -> None:
         f"Text: {metadata['word_count']} words, {metadata['characters']} characters; "
         f"{metadata['clause_count']} units, including {metadata['table_count']} tables."
     )
+    graph_update = metadata["graph_update"]
+    print(f"KG: {graph_update['entities']} named entities, "
+          f"{graph_update['relationships']} stated relationships; "
+          f"{graph_update['clauses']} source clauses updated.")
     print("\nSegmented units:")
     for clause in document["clauses"]:
         text = clause.get("text", "")

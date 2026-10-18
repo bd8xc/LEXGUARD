@@ -46,6 +46,8 @@ The seeder creates 50 fictional companies, 50 fictional people, and 200 syntheti
 
 NER-detected names from `contract_text` are included in the graph search. COI returns `party_roles`, `entities`, `clause_findings`, and `graph_result`. `graph_result.status: "unknown"` or `entity_resolution_failed` indicates the lookup could not establish the requested party relationship; it is not a verified negative conflict result. Review graph status and evidence together.
 
+Each successful contract ingestion writes a `COISource` and its `COIClause` nodes. Detected person, company, and location names become `COIEntity` nodes connected to the clause by `EXTRACTED_FROM`. Explicit relationship wording creates a typed `COI_RELATES_TO` edge with the contract ID, clause ID, evidence text, and `verified: false`. This uses the existing COI relationship vocabulary. A repeated upload of identical bytes replaces that document's old graph evidence in one transaction. Entity co-occurrence alone does not create a relationship edge. Neo4j must be reachable for the ingestion to succeed.
+
 The LE agent consumes the COI conflict flag. If the COI result has no conflict value, the current contract pipeline sends a fallback `0` to LE and labels its source in the response. This fallback means no positive COI result was available; it is not proof that the graph found no conflict.
 
 ## Data and limitations

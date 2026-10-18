@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from functools import lru_cache
 import sys
 from pathlib import Path
 from threading import Lock, Thread
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
@@ -114,8 +115,31 @@ app.mount("/static", StaticFiles(directory=PROJECT_ROOT / "static"), name="stati
 
 @app.get("/", include_in_schema=False)
 def frontend() -> FileResponse:
-    """Serve the small browser UI alongside the API and Swagger docs."""
+    """Serve the browser UI alongside the API and Swagger docs."""
     return FileResponse(PROJECT_ROOT / "static" / "index.html")
+
+
+_WEB_PAGES = {
+    "/review": "review.html",
+    "/results": "results.html",
+    "/workspaces": "workspaces.html",
+    "/tools/conflicts": "conflicts.html",
+    "/tools/clauses": "clauses.html",
+    "/tools/confidentiality": "confidentiality.html",
+    "/tools/litigation": "litigation.html",
+    "/advanced": "advanced.html",
+}
+
+
+def _page_handler(page: str):
+    def serve_page() -> FileResponse:
+        return FileResponse(PROJECT_ROOT / "static" / page)
+
+    return serve_page
+
+
+for _route, _page in _WEB_PAGES.items():
+    app.add_api_route(_route, _page_handler(_page), methods=["GET"], include_in_schema=False)
 
 
 _pipeline_instance = None
@@ -354,6 +378,250 @@ def analyze_contract(request: ContractAnalysisRequest) -> dict[str, Any]:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
+        from agents.coi.graph_manager import GraphQueryError
+        from neo4j.exceptions import DriverError, Neo4jError
+
+        if isinstance(exc, (GraphQueryError, DriverError, Neo4jError)):
+            raise HTTPException(status_code=503, detail="Contract ingestion failed because Neo4j is unavailable.") from exc
         # Return a useful error class without exposing local paths or tracebacks.
         raise HTTPException(status_code=500, detail=f"Analysis failed ({type(exc).__name__}).") from exc
     return jsonable_encoder(report)
+
+
+class WebPartyRequest(BaseModel):
+    doc_id: str = "browser-scan"
+    client_entity: str = Field(min_length=1)
+    counterparty_entity: str = Field(min_length=1)
+    contract_entities: list[str] = Field(default_factory=list)
+    additional_entities: list[str] = Field(default_factory=list)
+
+
+class WebReviewRequest(WebPartyRequest):
+    contract_text: str = Field(min_length=1, max_length=120_000)
+    features: dict[str, Any] = Field(default_factory=dict)
+    clause_deviation_override: float | None = Field(default=None, ge=0, le=1)
+
+
+class WebTextRequest(BaseModel):
+    contract_text: str = Field(min_length=1, max_length=120_000)
+    doc_id: str | None = None
+
+
+class WebRiskRequest(WebPartyRequest):
+    litigation_entities: dict[str, Any]
+    clause_deviation_score: float = Field(ge=0, le=1)
+
+
+class WebLitigationRequest(BaseModel):
+    entities: dict[str, Any]
+    graph_results: dict[str, Any]
+    clause_deviation_score: float = Field(ge=0, le=1)
+
+
+@app.get("/api/status", tags=["browser"])
+def web_status() -> dict[str, str]:
+    """Adapt the existing initialization and health checkpoints for the UI."""
+    names = {"coi": "COI", "cr": "CRA", "cl": "CL", "le": "LE"}
+    statuses = {}
+    for code, agent in names.items():
+        if code == "cr" and _standalone_cr_predictor.cache_info().currsize:
+            statuses[code] = "ready"
+            continue
+        initialized = _initialization["agents"].get(agent)
+        checked = _agent_health.get("agents", {}).get(agent, {}).get("status")
+        statuses[code] = (
+            "unavailable" if checked == "unavailable" or initialized == "error"
+            else "ready" if initialized == "ready"
+            else "initializing" if initialized in {"loading", "pending"} and _initialization["status"] == "initializing"
+            else "not_started"
+        )
+    return statuses
+
+
+@app.post("/api/extract", tags=["browser"])
+async def web_extract(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Preview uploaded text without adding the document to the KG."""
+    from ingestion_pipeline.document_input import MAX_FILE_BYTES, extract_text
+
+    content = await file.read(MAX_FILE_BYTES + 1)
+    try:
+        extracted = extract_text(file.filename or "", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"filename": Path(file.filename or "").name, "text": extracted,
+            "characters": len(extracted)}
+
+
+def _web_ingest(text: str):
+    from ingestion_pipeline.contract_ingestion import ingest_contract_bytes
+    from agents.coi.graph_manager import GraphQueryError
+    from neo4j.exceptions import DriverError, Neo4jError
+
+    try:
+        return ingest_contract_bytes("browser-contract.txt", text.encode("utf-8"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (GraphQueryError, DriverError, Neo4jError, OSError) as exc:
+        raise HTTPException(status_code=503, detail="Contract ingestion could not update Neo4j.") from exc
+
+
+@lru_cache(maxsize=1)
+def _standalone_cr_predictor():
+    from models.inference import ContractRiskPredictor
+
+    return ContractRiskPredictor()
+
+
+def _web_coi(request: WebPartyRequest) -> dict[str, Any]:
+    from agents.coi.conflict_agent import ConflictOfInterestAgent
+
+    try:
+        return ConflictOfInterestAgent().run(
+            client_entity=request.client_entity,
+            counterparty_entity=request.counterparty_entity,
+            contract_entities=request.contract_entities,
+            additional_entities=request.additional_entities,
+            doc_id=request.doc_id,
+        ).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _web_le(entities: dict[str, Any], graph_results: dict[str, Any], deviation: float) -> dict[str, Any]:
+    from litigation_agent.agent.litigation_agent import LitigationExposureAgent
+    from litigation_agent.intake import parse_litigation_payload
+
+    try:
+        state = parse_litigation_payload({"entities": entities, "graph_results": graph_results,
+                                          "clause_deviation_score": deviation})
+        return LitigationExposureAgent().predict_with_explanation(state)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _redact_confidentiality(report: dict[str, Any]) -> dict[str, Any]:
+    from agents.cl.confidentiality_leakage.masker import mask_value
+
+    return {**report, "findings": [
+        {**finding, "value": mask_value(finding.get("type", ""), finding.get("value", ""))}
+        for finding in report.get("findings", [])
+    ]}
+
+
+@app.post("/api/coi/check", tags=["browser"])
+def web_coi_check(request: WebPartyRequest) -> dict[str, Any]:
+    return _web_coi(request)
+
+
+@app.post("/api/le/predict", tags=["browser"])
+def web_le_predict(request: WebLitigationRequest) -> dict[str, Any]:
+    return _web_le(request.entities, request.graph_results, request.clause_deviation_score)
+
+
+@app.post("/api/risk/assess", tags=["browser"])
+def web_risk_assess(request: WebRiskRequest) -> dict[str, Any]:
+    coi = _web_coi(request)
+    if coi["status"] != "complete" or coi["conflict_flag"] is None:
+        return {"status": "partial", "coi": coi, "litigation": None,
+                "reason": "Litigation scoring requires a completed COI graph check."}
+    litigation = _web_le(request.litigation_entities, {"conflict_flag": coi["conflict_flag"]},
+                         request.clause_deviation_score)
+    return {"status": "complete", "coi": coi, "litigation": litigation}
+
+
+@app.post("/api/cl/analyze", tags=["browser"])
+def web_cl_analyze(request: WebTextRequest) -> dict[str, Any]:
+    from agents.cl.confidentiality_leakage import ConfidentialityLeakageAgent
+
+    document = _web_ingest(request.contract_text)
+    result = ConfidentialityLeakageAgent().analyze(
+        doc_id=document["contract_id"], clauses=document["clauses"]
+    ).model_dump()
+    return jsonable_encoder({"status": "complete", **_redact_confidentiality(result)})
+
+
+@app.post("/api/cr/analyze", tags=["browser"])
+def web_cr_analyze(request: WebTextRequest) -> dict[str, Any]:
+    document = _web_ingest(request.contract_text)
+    eligible = [clause for clause in document["clauses"] if len(clause["text"].split()) >= 5]
+    try:
+        predictor = (_pipeline_instance.contract_risk.predictor if _pipeline_instance
+                     else _standalone_cr_predictor())
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Clause model unavailable ({type(exc).__name__}).") from exc
+    clauses = []
+    for clause in eligible[:12]:
+        try:
+            model = predictor.predict(clause["text"])
+            prediction = str(model.get("prediction", ""))
+            if prediction.casefold() == "baseline":
+                model = {**model, "prediction": "Seed"}
+            clauses.append({"clause_id": clause["clause_id"], "model": model})
+        except Exception as exc:
+            clauses.append({"clause_id": clause["clause_id"], "reason": type(exc).__name__})
+    return jsonable_encoder({
+        "status": "complete" if all("model" in clause for clause in clauses) else "partial",
+        "clauses": clauses, "omitted_clause_count": len(eligible[12:]),
+        "model_note": "LegalBERT labels are risk signals, not calibrated probabilities.",
+    })
+
+
+@app.post("/api/analyze", tags=["browser"])
+def web_analyze(request: WebReviewRequest) -> dict[str, Any]:
+    try:
+        party_hints = PartyInput(client=request.client_entity,
+                                 counterparty=request.counterparty_entity,
+                                 additional=request.contract_entities + request.additional_entities)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    report = analyze_contract(ContractAnalysisRequest(
+        filename="browser-contract.txt", contract_text=request.contract_text,
+        parties=party_hints,
+        include_litigation_exposure=request.clause_deviation_override is not None,
+        entities=request.features,
+        clause_deviation_score=request.clause_deviation_override,
+    ))
+    graph = report["coi"].get("graph_result") or {
+        "status": "unknown", "conflict_detected": False,
+        "severity": "UNKNOWN", "reason": "COI graph check did not run.",
+    }
+    graph = {**graph, "clause_findings": report["coi"].get("clause_findings", []),
+             "entities": report["coi"].get("entities", []),
+             "party_roles": report["coi"].get("party_roles", {})}
+    clauses = []
+    for clause in report["clauses"]:
+        model = (clause.get("cra") or {}).get("model")
+        if model and str(model.get("prediction", "")).casefold() == "baseline":
+            model = {**model, "prediction": "Seed"}
+        clauses.append({"clause_id": clause["clause_id"], "model": model,
+                        **({"reason": clause["cra_error"]} if clause.get("cra_error") else {})})
+    cr = {"status": "partial" if report["summary"]["clauses_failed"] else "complete",
+          "clauses": clauses, "omitted_clause_count": report["summary"]["clauses_skipped"]}
+    cl = {"status": "complete", **_redact_confidentiality(report["confidentiality"])}
+    le_report = report["litigation_exposure"]
+    le = le_report if le_report.get("status") == "complete" and graph.get("status") == "complete" else None
+    reasons = []
+    if graph.get("status") != "complete":
+        reasons.append("COI graph evidence is incomplete or unverified.")
+    if graph.get("conflict_detected"):
+        reasons.append("A potential conflict path needs human review.")
+    if graph["clause_findings"]:
+        reasons.append("A clause contains a potential conflict pattern that needs verification.")
+    if cr["status"] != "complete":
+        reasons.append("Some clauses could not be classified.")
+    if report["confidentiality"].get("risk_level") == "HIGH":
+        reasons.append("High confidentiality risk was reported.")
+    if le is None:
+        reasons.append("Litigation exposure was not scored.")
+    if not reasons:
+        reasons.append("Automated findings require human assessment.")
+    return jsonable_encoder({
+        "doc_id": report["contract_id"],
+        "status": "complete" if graph.get("status") == "complete" and cr["status"] == "complete" and le else "partial",
+        "coi": graph, "cr": cr, "cl": cl, "le": le,
+        "le_status": ("skipped: COI incomplete" if le_report.get("status") == "complete" and le is None
+                      else le_report.get("status", "not_requested")),
+        "decision": {"human_review_required": report["summary"]["human_review_required"],
+                     "reasons": reasons, "limitations": []},
+        "graph_update": report.get("metadata", {}).get("graph_update"),
+    })
