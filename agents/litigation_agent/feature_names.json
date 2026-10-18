@@ -1,0 +1,11 @@
+[
+  "deal_size",
+  "liability_cap",
+  "auto_renewal",
+  "jurisdiction_risk",
+  "conflict_flag",
+  "clause_deviation_score",
+  "indemnification_clause",
+  "dispute_history",
+  "governing_law_clarity"
+]

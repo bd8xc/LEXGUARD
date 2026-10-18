@@ -1,0 +1,15 @@
+{
+  "entities": {
+    "deal_size": null,
+    "liability_cap": null,
+    "auto_renewal": null,
+    "jurisdiction_risk": null,
+    "indemnification_clause": null,
+    "dispute_history": null,
+    "governing_law_clarity": null
+  },
+  "graph_results": {
+    "conflict_flag": null
+  },
+  "clause_deviation_score": null
+}

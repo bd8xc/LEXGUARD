@@ -1,0 +1,18 @@
+{
+  "parties": {
+    "client": "Acme Components Pvt. Ltd.",
+    "counterparty": "Alpha Orb Technologies Ltd.",
+    "additional": ["Aarav Mehta"]
+  },
+  "entities": {
+    "deal_size": 750000,
+    "liability_cap": 1,
+    "auto_renewal": 1,
+    "jurisdiction_risk": 5,
+    "indemnification_clause": 1,
+    "dispute_history": 0,
+    "governing_law_clarity": 4
+  },
+  "graph_results": {},
+  "clause_deviation_score": 0.4
+}

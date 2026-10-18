@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "name": "COI Legal Risk Knowledge Base",
+    "version": "0.1.0",
+    "description": "Reference-backed legal and contractual principles used for semantic retrieval and contract-risk analysis.",
+    "principle_count": 8
+  },
+  "principles": [
+    {
+      "id": "TERM_001",
+      "topic": "Termination and Remedies",
+      "subtopic": "Refusal to Perform Contract",
+      "jurisdiction": "India",
+      "authority_type": "Primary legislation",
+      "principle": "Where a party refuses to perform, or disables itself from performing, its promise in its entirety, the other party may have a right to put an end to the contract unless it has accepted the contract's continuation.",
+      "risk_factors": [
+        "complete refusal by a contracting party to perform its obligations",
+        "conduct that disables a party from performing the contract",
+        "continued performance after repudiatory conduct without clearly addressing the consequences"
+      ],
+      "mitigating_factors": [
+        "clear contractual remedies for material non-performance",
+        "documented response to repudiatory conduct",
+        "termination mechanisms aligned with applicable legal rights"
+      ],
+      "source_title": "The Indian Contract Act, 1872",
+      "source_section": "Section 39 - Effect of refusal of party to perform promise wholly",
+      "source_reference": "India Code, Act No. 09 of 1872",
+      "analysis_note": "Use this principle when assessing clauses dealing with complete refusal, repudiation, or termination arising from fundamental non-performance. It does not establish that every termination clause is high risk."
+    },
+    {
+      "id": "TERM_002",
+      "topic": "Termination and Remedies",
+      "subtopic": "Time-Critical Performance",
+      "jurisdiction": "India",
+      "authority_type": "Primary legislation",
+      "principle": "Failure to perform an obligation at a fixed time may affect whether the contract, or the unperformed part of it, is voidable when the parties intended time to be essential; where time is not essential, delay may instead support a claim for compensation.",
+      "risk_factors": [
+        "strict performance deadlines without clarity on whether time is essential",
+        "termination consequences triggered by minor delay",
+        "unclear consequences of late performance"
+      ],
+      "mitigating_factors": [
+        "clear identification of time-critical obligations",
+        "proportionate consequences for delay",
+        "reasonable extension or remediation mechanisms where appropriate"
+      ],
+      "source_title": "The Indian Contract Act, 1872",
+      "source_section": "Section 55 - Effect of failure to perform at fixed time, in contract in which time is essential",
+      "source_reference": "India Code, Act No. 09 of 1872",
+      "analysis_note": "Use this principle to analyze deadlines, delay, time-is-of-the-essence provisions and termination rights tied to late performance."
+    },
+    {
+      "id": "REMEDY_002",
+      "topic": "Termination and Remedies",
+      "subtopic": "Compensation Following Rightful Rescission",
+      "jurisdiction": "India",
+      "authority_type": "Primary legislation",
+      "principle": "A person who rightfully rescinds a contract may be entitled to compensation for damage sustained through the contract's non-fulfilment.",
+      "risk_factors": [
+        "termination provisions that ignore accrued consequences of breach",
+        "unclear treatment of losses following rightful rescission",
+        "contract language suggesting termination automatically eliminates all accrued remedies"
+      ],
+      "mitigating_factors": [
+        "clear preservation of accrued rights and remedies",
+        "defined consequences of termination",
+        "express treatment of outstanding obligations and claims"
+      ],
+      "source_title": "The Indian Contract Act, 1872",
+      "source_section": "Section 75 - Party rightfully rescinding contract, entitled to compensation",
+      "source_reference": "India Code, Act No. 09 of 1872",
+      "analysis_note": "Use this principle when assessing consequences-of-termination provisions and whether accrued rights or remedies are addressed."
+    },
+    {
+      "id": "INDEM_001",
+      "topic": "Indemnification",
+      "subtopic": "Nature and Scope of Indemnity",
+      "jurisdiction": "India",
+      "authority_type": "Primary legislation",
+      "principle": "An indemnity is a contractual undertaking by one party to protect another from loss caused by the promisor's conduct or by the conduct of another person, and the indemnity-holder may have specified rights when acting within the scope of that indemnity.",
+      "risk_factors": [
+        "very broad indemnity scope",
+        "indemnity obligations extending beyond clearly identified events",
+        "unclear boundaries on covered losses or claims",
+        "indemnity wording disconnected from the party responsible for the relevant risk"
+      ],
+      "mitigating_factors": [
+        "clearly defined indemnified events",
+        "scope linked to identified contractual risks",
+        "clear treatment of covered damages, costs and proceedings",
+        "appropriate financial limits where commercially and legally suitable"
+      ],
+      "source_title": "The Indian Contract Act, 1872",
+      "source_section": "Sections 124 and 125 - Contract of indemnity and rights of indemnity-holder",
+      "source_reference": "India Code, Act No. 09 of 1872",
+      "analysis_note": "Sections 124 and 125 establish the statutory framework for indemnity. The listed risk and mitigating factors are analytical considerations derived for contract review and should not be presented as statutory wording."
+    }
+  ]
+}

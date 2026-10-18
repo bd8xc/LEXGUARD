@@ -1,0 +1,17 @@
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: lexguard-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: "${NEO4J_USER}/${NEO4J_PASSWORD}"
+    ports:
+      - "127.0.0.1:7475:7474"
+      - "127.0.0.1:7688:7687"
+    volumes:
+      - lexguard_neo4j_data:/data
+      - lexguard_neo4j_logs:/logs
+
+volumes:
+  lexguard_neo4j_data:
+  lexguard_neo4j_logs:

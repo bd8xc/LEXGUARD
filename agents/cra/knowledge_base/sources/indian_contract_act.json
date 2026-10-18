@@ -1,0 +1,21 @@
+{
+  "document": {
+    "title": "The Indian Contract Act, 1872",
+    "jurisdiction": "India",
+    "authority_type": "Primary legislation",
+    "act_number": "9 of 1872",
+    "source_name": "India Code"
+  },
+  "provisions": [
+    {
+      "section": "39",
+      "heading": "Effect of refusal of party to perform promise wholly",
+      "text": "When a party to a contract has refused to perform, or disabled himself from performing, his promise in its entirety, the promisee may put an end to the contract, unless he has signified, by words or conduct, his acquiescence in its continuance."
+    },
+    {
+      "section": "73",
+      "heading": "Compensation for loss or damage caused by breach of contract",
+      "text": "When a contract has been broken, the party who suffers by such breach is entitled to receive, from the party who has broken the contract, compensation for any loss or damage caused to him thereby, which naturally arose in the usual course of things from such breach, or which the parties knew, when they made the contract, to be likely to result from the breach of it."
+    }
+  ]
+}
