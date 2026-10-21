@@ -57,3 +57,5 @@ h1,h2,p{margin-top:0}h1,h2{font-size:19px;line-height:1.2;letter-spacing:-.025em
 @media(max-width:800px){.status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.container{width:calc(100% - 24px)}.topbar-inner{align-items:flex-start;flex-direction:column;padding-block:12px;gap:7px}.panel{padding:17px}.request-controls{align-items:stretch;flex-direction:column}.request-controls .field{width:100%;margin-bottom:0}.form-actions{align-items:flex-start;flex-direction:column}.json-editor{height:300px}.result-grid{grid-template-columns:1fr}}
 @media(max-width:420px){.status-grid{grid-template-columns:1fr}.topbar-right{gap:10px;flex-wrap:wrap}}
+
+.brand{align-items:center}.brand .lexguard-logo{display:inline-block;width:23px;height:23px;background:#143c53;mask:url('/static/lexguard-logo.svg') center/contain no-repeat}

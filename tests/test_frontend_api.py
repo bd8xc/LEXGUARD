@@ -16,9 +16,22 @@ class FrontendApiTests(unittest.TestCase):
     def test_pages_and_assets_are_served(self):
         for route in ("/", "/review", "/results", "/workspaces", "/advanced",
                       "/tools/conflicts", "/tools/clauses", "/tools/confidentiality",
-                      "/tools/litigation", "/static/app.js", "/static/styles.css"):
+                      "/tools/litigation", "/static/app.js", "/static/styles.css",
+                      "/static/lexguard-logo.svg"):
             with self.subTest(route=route):
                 self.assertEqual(200, self.client.get(route).status_code)
+
+    def test_branding_and_theme_script_on_frontend_pages(self):
+        for route in ("/", "/review", "/results", "/workspaces",
+                      "/tools/conflicts", "/tools/clauses", "/tools/confidentiality",
+                      "/tools/litigation"):
+            with self.subTest(route=route):
+                page = self.client.get(route).text
+                self.assertIn("/static/lexguard-logo.svg", self.client.get("/static/styles.css").text)
+                self.assertIn("css2?family=DM+Sans", page)
+                self.assertIn("t==='light'||t==='dark'?t:", page)
+                self.assertNotIn("Instrument+Serif", page)
+                self.assertNotIn("&#9671;", page)
 
     def test_file_preview_does_not_ingest(self):
         with patch("ingestion_pipeline.contract_ingestion.ingest_contract_bytes") as ingest:
