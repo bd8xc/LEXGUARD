@@ -62,6 +62,23 @@ input:focus-visible { border-color: var(--green); box-shadow: 0 0 0 3px #174b3c1
 .le-fields { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .le-fields summary { width: fit-content; color: var(--green); cursor: pointer; font-size: 12px; font-weight: 700; }
 .le-grid { margin-top: 18px; }
+.choice-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+.choice-field legend { padding: 0; color: #3d4a44; font-size: 12px; font-weight: 650; }
+.choice-buttons { display: flex; gap: 8px; margin-top: 7px; }
+.choice-option { display: block; cursor: pointer; }
+.choice-option input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.choice-option span { display: grid; min-width: 76px; min-height: 43px; place-items: center; padding: 8px 14px; border: 1px solid #cbd5ce; border-radius: 8px; background: #fff; color: var(--muted); font-size: 13px; font-weight: 650; transition: border-color .16s ease, background .16s ease, color .16s ease; }
+.choice-option span:hover { border-color: #8ca79a; }
+.choice-option input:checked + span { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+.choice-option input:focus-visible + span { outline: 3px solid #39866c; outline-offset: 3px; }
+.choice-help { margin: 7px 0 0; color: var(--muted); font-size: 10px; font-weight: 400; line-height: 1.4; }
+.range-field { gap: 8px; }
+.range-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.range-heading output { color: var(--green-dark); font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 750; }
+input[type="range"] { width: 100%; min-height: 20px; margin: 0; accent-color: var(--green); cursor: pointer; }
+input[type="range"]:focus-visible { border: 0; box-shadow: none; outline: 3px solid #39866c; outline-offset: 3px; }
+.range-extremes { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 10px; font-weight: 400; line-height: 1.4; }
+.range-extremes span:last-child { text-align: right; }
 .form-actions { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 25px; }
 .error-text { margin: 0; color: var(--red); font-size: 12px; }
 .button-primary, .button-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 15px; min-height: 45px; padding: 0 18px; border: 1px solid transparent; border-radius: 8px; font-size: 12px; font-weight: 750; text-decoration: none; cursor: pointer; transition: background .16s ease, transform .16s ease; }

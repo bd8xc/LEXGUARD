@@ -53,29 +53,55 @@
           <label>Deal size (USD)
             <input name="deal_size" type="number" min="50000" max="5000000" step="any" placeholder="50,000–5,000,000">
           </label>
-          <label>Liability cap / deal size
-            <input name="liability_cap" type="number" min="0" max="1" step="any" placeholder="0–1">
+          <fieldset class="choice-field">
+            <legend>Liability cap</legend>
+            <div class="choice-buttons">
+              <label class="choice-option"><input type="radio" name="liability_cap" value="0"><span>No</span></label>
+              <label class="choice-option"><input type="radio" name="liability_cap" value="1"><span>Yes</span></label>
+            </div>
+            <p class="choice-help">No = absent. Yes = stated; the LE model treats a cap as protective.</p>
+          </fieldset>
+          <fieldset class="choice-field">
+            <legend>Auto renewal</legend>
+            <div class="choice-buttons">
+              <label class="choice-option"><input type="radio" name="auto_renewal" value="0"><span>No</span></label>
+              <label class="choice-option"><input type="radio" name="auto_renewal" value="1"><span>Yes</span></label>
+            </div>
+            <p class="choice-help">Yes = the agreement renews automatically; the model treats this as a minor risk.</p>
+          </fieldset>
+          <label class="range-field">
+            <span class="range-heading"><span>Jurisdiction risk</span><output id="jurisdiction-risk-value" for="jurisdiction-risk" aria-live="polite">5 / 10</output></span>
+            <input id="jurisdiction-risk" name="jurisdiction_risk" type="range" min="1" max="10" step="1" value="5" data-output="jurisdiction-risk-value" aria-label="Jurisdiction risk: 1 stable to 10 highly adversarial">
+            <span class="range-extremes"><span>1 = Stable</span><span>10 = Highly adversarial</span></span>
           </label>
-          <label>Auto renewal (0 or 1)
-            <input name="auto_renewal" type="number" min="0" max="1" step="1" placeholder="0 or 1">
+          <fieldset class="choice-field">
+            <legend>Indemnification protection</legend>
+            <div class="choice-buttons">
+              <label class="choice-option"><input type="radio" name="indemnification_clause" value="0"><span>No</span></label>
+              <label class="choice-option"><input type="radio" name="indemnification_clause" value="1"><span>Yes</span></label>
+            </div>
+            <p class="choice-help">No = weak or absent. Yes = strong and clearly scoped.</p>
+          </fieldset>
+          <fieldset class="choice-field">
+            <legend>Prior disputes with this counterparty</legend>
+            <div class="choice-buttons">
+              <label class="choice-option"><input type="radio" name="dispute_history" value="0"><span>No</span></label>
+              <label class="choice-option"><input type="radio" name="dispute_history" value="1"><span>Yes</span></label>
+            </div>
+            <p class="choice-help">No = none. Yes = a prior dispute with this counterparty.</p>
+          </fieldset>
+          <label class="range-field">
+            <span class="range-heading"><span>Governing law clarity</span><output id="governing-law-value" for="governing-law-clarity" aria-live="polite">3 / 5</output></span>
+            <input id="governing-law-clarity" name="governing_law_clarity" type="range" min="1" max="5" step="1" value="3" data-output="governing-law-value" aria-label="Governing law clarity: 1 vague or contested to 5 clear and predictable">
+            <span class="range-extremes"><span>1 = Vague or contested</span><span>5 = Clear and predictable</span></span>
           </label>
-          <label>Jurisdiction risk (1–10)
-            <input name="jurisdiction_risk" type="number" min="1" max="10" step="any" placeholder="1–10">
-          </label>
-          <label>Indemnification present (0 or 1)
-            <input name="indemnification_clause" type="number" min="0" max="1" step="1" placeholder="0 or 1">
-          </label>
-          <label>Prior dispute history (0 or 1)
-            <input name="dispute_history" type="number" min="0" max="1" step="1" placeholder="0 or 1">
-          </label>
-          <label>Governing law clarity (1–5)
-            <input name="governing_law_clarity" type="number" min="1" max="5" step="any" placeholder="1–5">
-          </label>
-          <label>Clause deviation (0–1)
-            <input name="clause_deviation_score" type="number" min="0" max="1" step="any" placeholder="0–1">
+          <label class="range-field">
+            <span class="range-heading"><span>Clause deviation</span><output id="clause-deviation-value" for="clause-deviation" aria-live="polite">0.50</output></span>
+            <input id="clause-deviation" name="clause_deviation_score" type="range" min="0" max="1" step="0.01" value="0.50" data-output="clause-deviation-value" aria-label="Clause deviation: 0 standard clauses to 1 maximum deviation">
+            <span class="range-extremes"><span>0 = Standard clauses</span><span>1 = Maximum deviation</span></span>
           </label>
         </div>
-        <p class="field-note">Leave these blank to skip LE. All seven contract features and clause deviation are required to run it.</p>
+        <p class="field-note">Enter the deal size and choose Yes or No for all four items. Adjust each slider to match the contract. These inputs are required to run the experimental LE model.</p>
       </details>
 
       <div class="form-actions">

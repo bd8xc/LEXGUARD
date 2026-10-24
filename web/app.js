@@ -11,6 +11,16 @@ const results = document.querySelector("#results");
 const activeJobKey = "lexguard.activeJobId";
 let eventSource = null;
 
+document.querySelectorAll('input[type="range"][data-output]').forEach((slider) => {
+  const output = document.getElementById(slider.dataset.output);
+  const updateOutput = () => {
+    output.value = slider.name === "clause_deviation_score"
+      ? Number(slider.value).toFixed(2)
+      : `${slider.value} / ${slider.max}`;
+  };
+  slider.addEventListener("input", updateOutput);
+});
+
 function make(tag, text = "", className = "") {
   const element = document.createElement(tag);
   if (text !== null && text !== undefined) element.textContent = String(text);
