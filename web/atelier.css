@@ -446,3 +446,29 @@ body[data-page=results] .state-caption{max-width:230px;margin-top:16px;color:var
   .result-heading h1{font-size:46px}
   .report-hero h2{font-size:51px}
 }
+
+.contribution-details{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.contribution-details>summary{cursor:pointer;color:var(--text);font-size:12px;font-weight:700}
+.contribution-plot{margin-top:12px}
+.contribution-axis,.contribution-row{display:grid;grid-template-columns:minmax(110px,28%) minmax(0,1fr) 78px;gap:12px;align-items:center}
+.contribution-axis{padding:4px 0 8px;color:var(--subtle);font-size:10px;font-variant-numeric:tabular-nums}
+.contribution-axis-scale{display:flex;justify-content:space-between;align-items:center}
+.contribution-axis-scale span:nth-child(2){color:var(--muted)}
+.contribution-row{min-height:34px;border-top:1px solid var(--line)}
+.contribution-name{color:var(--muted);font-size:11px;overflow-wrap:anywhere;text-transform:capitalize}
+.contribution-track{position:relative;height:18px;min-width:0}
+.contribution-zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.contribution-segment{position:absolute;top:50%;height:2px;transform:translateY(-50%)}
+.contribution-segment.negative{right:50%;background:var(--danger)}
+.contribution-segment.positive{left:50%;background:var(--mint)}
+.contribution-segment:after{position:absolute;top:50%;width:7px;height:7px;border:1px solid var(--bg);border-radius:50%;content:"";transform:translateY(-50%)}
+.contribution-segment.negative:after{left:0;background:var(--danger);transform:translate(-50%,-50%)}
+.contribution-segment.positive:after{right:0;background:var(--mint);transform:translate(50%,-50%)}
+.contribution-value{text-align:right;font-size:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.contribution-value.negative{color:var(--danger)}
+.contribution-value.positive{color:var(--mint)}
+.contribution-caption{margin:11px 0 0;color:var(--subtle);font-size:10px;line-height:1.5}
+@media(max-width:600px){
+  .contribution-axis,.contribution-row{grid-template-columns:minmax(78px,31%) minmax(0,1fr) 70px;gap:7px}
+  .contribution-name,.contribution-value{font-size:9px}
+}

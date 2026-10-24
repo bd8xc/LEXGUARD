@@ -281,6 +281,45 @@ function details(parent, title, values) {
   values.forEach(value => content.append(node("p", "finding-row", value)));
   add(box, summary, content); parent.append(box);
 }
+function contributionPlot(explanation) {
+  const entries = Object.entries(explanation || {})
+    .map(([name, raw]) => [name, Number(raw)])
+    .filter(([, value]) => Number.isFinite(value));
+  if (!entries.length) return null;
+
+  const largest = Math.max(...entries.map(([, value]) => Math.abs(value)));
+  const axisMax = Math.max(0.1, Math.ceil(largest * 10) / 10);
+  const endpoint = axisMax.toFixed(axisMax < 10 ? 1 : 0);
+  const box = node("details", "contribution-details");
+  const content = node("div", "contribution-plot");
+  const axis = node("div", "contribution-axis");
+  const scale = node("div", "contribution-axis-scale");
+  add(scale, node("span", "", "−" + endpoint), node("span", "", "0"), node("span", "", "+" + endpoint));
+  add(axis, node("span"), scale, node("span"));
+  content.append(axis);
+
+  entries.forEach(([name, value]) => {
+    const row = node("div", "contribution-row");
+    const track = node("span", "contribution-track");
+    const zero = node("span", "contribution-zero");
+    const segment = node("span", "contribution-segment " + (value < 0 ? "negative" : "positive"));
+    segment.style.width = (50 * Math.abs(value) / axisMax) + "%";
+    track.setAttribute("aria-hidden", "true");
+    track.append(zero, segment);
+    const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+    add(row,
+      node("span", "contribution-name", name.replaceAll("_", " ")),
+      track,
+      node("span", "contribution-value " + (value < 0 ? "negative" : "positive"), sign + value.toFixed(6)));
+    content.append(row);
+  });
+
+  add(box,
+    node("summary", "", "Model contributions"),
+    content,
+    node("p", "contribution-caption", "Negative contributions lower the model output; positive contributions raise it."));
+  return box;
+}
 function renderCoi(coi) {
   const value = coi || {}, report = value.report || {}, article = card("Conflict of interest", "01 / COI", value.status);
   const metrics = node("div", "submetric-row");
@@ -367,7 +406,7 @@ function renderLe(le) {
   article.append(metrics);
   article.append(node("p", "", value.reason || value.interpretation || "Synthetic-trained model output; human review required."));
   if (result.features_used) details(article, "Features used", Object.entries(result.features_used).map(([key, item]) => key.replaceAll("_", " ") + ": " + item));
-  if (result.shap_explanation) details(article, "Model contributions", Object.entries(result.shap_explanation).map(([key, item]) => key.replaceAll("_", " ") + ": " + item));
+  if (result.shap_explanation) article.append(contributionPlot(result.shap_explanation));
   return article;
 }
 function chart(cr) {
