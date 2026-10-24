@@ -12,11 +12,17 @@ py -3.12 -m venv .venv
 Copy-Item .env.example .env
 ```
 
-Set the Neo4j connection values in `.env` to enable COI graph search. Do not commit or share `.env`.
+Set a unique `NEO4J_PASSWORD` in `.env` before starting Neo4j. The same `.env` configures the container and the Python client. Do not commit or share it. Start the local graph with:
+
+```powershell
+docker compose --env-file .env -f agents/coi/compose.yaml up -d
+```
+
+Neo4j Browser is at `http://127.0.0.1:7474`; Bolt is bound to `127.0.0.1:7687`. The database is initially empty. COI returns an unresolved result until its graph has relationship data for the named parties. Contract submissions do not populate it.
 
 Set `LEXGUARD_LLM_API_STYLE`, `LEXGUARD_LLM_BASE_URL`, and `LEXGUARD_LLM_MODEL` to configure CR's clause-level LLM. Defaults use local Ollama (`ollama`, `http://localhost:11434`, `qwen2.5:1.5b`). An OpenAI-compatible server can be used by setting `LEXGUARD_LLM_API_STYLE=openai_compatible` and its base URL ending in `/v1`; set `LEXGUARD_LLM_API_KEY` only if that server requires it. Keep contract-serving endpoints on a private network.
 
-CR loads its model from `checkpoints\best_model.pt` or `agents\cr\checkpoints\best_model.pt`. If neither file exists, CR reports `unavailable` while the other agents continue where possible.
+CR loads its model from `checkpoints\best_model.pt` or `agents\cr\checkpoints\best_model.pt`. If neither file exists, CR reports `unavailable` while the other agents continue where possible. If LegalBERT is loaded but the configured LLM server is unavailable, `/api/status` reports CR as `degraded`; classification and legal retrieval still run, while grounded explanations remain incomplete.
 
 ## Run
 
@@ -34,7 +40,9 @@ Start the local web backend from the repository root:
 .\.venv\Scripts\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 
-On each server start, the backend loads LegalBERT, the India-law embedding model and corpus vectors, and the LLM client once before it accepts uploads. This initial warm-up is printed in the server terminal. Later contracts reuse those loaded objects; restarting the backend loads them again. Each document is still extracted and split on its own. Open `http://127.0.0.1:8000` in your browser. Upload a PDF, DOCX, or TXT file, enter COI parties, and optionally fill all seven LE features plus clause deviation. Analysis runs one job at a time. Clause-level progress appears in the browser and in the server terminal; the terminal output remains available while the browser shows the progress bar and event log. Results include separate CR, CL, COI, and LE findings plus JSON/PDF download links. Uploads are saved under `contracts\uploads\` and reports under `agents\cr\outputs\`.
+On each server start, the backend tries to load the CR checkpoint, LegalBERT, the India-law embeddings, and the LLM client. This warm-up is printed in the server terminal. If the CR checkpoint is absent, CR reports unavailable while other available checks continue. Each document is still extracted and split on its own. Open `http://127.0.0.1:8000` in your browser. The multipage interface has an overview, guided review, live results, four specialist workspaces, and a developer console. The guided review accepts a PDF, DOCX, or TXT file (up to 5 MiB), or pasted text. Its upload preview lets you check extracted text; edits to that preview are submitted as text. Client, counterparty, and additional entities are optional for a full review; COI needs both parties to run. LE runs only when all seven features plus clause deviation are supplied and COI returns a known conflict flag. Analysis runs one job at a time. The results page reconnects to live job progress and offers JSON/PDF downloads. The last completed report is retained in that browser tab until the tab closes. Uploads are saved under `contracts\uploads\` and reports under `agents\cr\outputs\`.
+
+The specialist pages call `/api/tools/conflicts`, `/api/tools/clauses`, `/api/tools/confidentiality`, and `/api/tools/litigation`. They use the same coordinator agent functions as the combined workflow. The conflict pages search the configured Neo4j graph and never ingest the submitted contract into it. `/api/extract` previews uploaded text without starting analysis. `/api/status` reports local model and service availability. The developer console exercises the specialist JSON routes; run a complete document review through `/review`.
 
 ### CLI
 
@@ -44,15 +52,13 @@ On each server start, the backend loads LegalBERT, the India-law embedding model
 
 The CLI remains available and prints the same progress events. It asks for a contract path plus client and counterparty names for the Neo4j graph lookup. For the synthetic demo PDF and seeded graph, enter `Alpha Org` and `Alpha Labs`. It then prompts for LE's seven contract features and clause-deviation score. Enter all eight to run LE; leave any blank to skip it. The COI conflict flag is supplied directly by Neo4j and is not an operator input.
 
-## Synthetic COI demo
+## Optional synthetic COI fixture
 
-The separate demo command seeds the configured Neo4j database with 100 fictional companies, 50 fictional people, 123 relationships, and LOW/MEDIUM/HIGH trigger edges. Company names are like `Alpha Org`; person names are like `Anurag Demo`. It then runs one COI example at each severity. Every row is labeled `SYNTHETIC DEMO ONLY`; rerunning replaces the fixture and removes orphaned nodes from the earlier generic fixture.
+`agents/coi/synthetic_graph.py` can seed a small, explicitly synthetic test fixture into the configured graph. It is not run automatically and its unverified relationships are not real evidence. Use approved relationship data for a real review.
 
 ```powershell
-.\.venv\Scripts\python.exe -m agents.coi.demo
+.\.venv\Scripts\python.exe -m agents.coi.synthetic_graph
 ```
-
-The integrated contract runner can search these demo relationships when the entered parties match the seeded companies. `Alpha Org` and `Alpha Labs` share a synthetic director and demonstrate a LOW conflict. Its COI result comes from the existing graph; no relationships are extracted from the submitted contract.
 
 Reports are written to `agents\cr\outputs\` as separate JSON and PDF files. CL-detected sensitive values are masked in exported evidence. The `review_required` field remains true; agent scores are not combined. LE's model was trained using synthetic labels, so its score is not a calibrated real-world litigation probability.
 

@@ -220,6 +220,9 @@ __marimo__/
 
 # Keep core COI implementation and utilities
 !conflict_agent.py
+!domain.py
+!graph_manager.py
+!compose.yaml
 !synthetic_graph.py
 
 # Keep COI test coverage

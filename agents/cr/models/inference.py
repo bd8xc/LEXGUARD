@@ -4,11 +4,11 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 
-from models.config import Config
-from models.sliding_legalbert import SlidingWindowLegalBERT
+from agents.cr.models.config import Config
+from agents.cr.models.sliding_legalbert import SlidingWindowLegalBERT
 
-from processing.risk_validator import LegalRiskValidator
-from processing.risk_resolver import RiskResolver
+from agents.cr.processing.risk_validator import LegalRiskValidator
+from agents.cr.processing.risk_resolver import RiskResolver
 
 
 class ContractRiskPredictor:

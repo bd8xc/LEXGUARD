@@ -1,137 +1,19 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#122520">
-  <title>LexGuard · Contract review</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20261024-2">
-  <script src="/assets/app.js" defer></script>
-</head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="LexGuard home"><span class="brand-mark">L</span><span>LEXGUARD</span></a>
-    <div class="local-indicator"><span class="pulse-dot"></span> LOCAL WORKSPACE</div>
-  </header>
+<!DOCTYPE html>
 
-  <main class="shell">
-    <section class="intro">
-      <p class="eyebrow">CONTRACT INTELLIGENCE</p>
-      <h1>Review a contract.</h1>
-      <p class="intro-copy">Run clause risk, Indian Contract Act retrieval, confidentiality, conflict, and litigation checks in one place.</p>
-    </section>
-
-    <form id="contract-form" class="form-panel">
-      <div class="section-heading">
-        <div><h2>Start an analysis</h2><p>Choose a document and provide the party details used by the conflict check.</p></div>
-        <span class="step-label">ONE DOCUMENT</span>
-      </div>
-
-      <label class="upload-zone" for="contract-file">
-        <span class="upload-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5v4h14v-4" /></svg></span>
-        <span class="upload-title" id="upload-title">Choose a contract to upload</span>
-        <span class="upload-hint">PDF, DOCX, or TXT · up to 50 MB</span>
-        <input id="contract-file" name="file" type="file" accept=".pdf,.docx,.txt,application/pdf" required>
-      </label>
-
-      <div class="field-grid parties-grid">
-        <label>Client / primary party
-          <input name="client_entity" type="text" placeholder="e.g. Alpha Org" autocomplete="organization">
-        </label>
-        <label>Counterparty
-          <input name="counterparty_entity" type="text" placeholder="e.g. Alpha Labs" autocomplete="off">
-        </label>
-      </div>
-      <label class="wide-field">Additional entities (optional)
-        <input name="additional_entities" type="text" placeholder="e.g. Alpha Holdings, Anurag Demo" autocomplete="off" aria-describedby="additional-entities-help">
-      </label>
-      <p id="additional-entities-help" class="field-note">Separate additional people or companies with commas. COI checks these names against the configured Neo4j graph. LE runs when all its fields are supplied and COI returns a known flag.</p>
-
-      <details class="le-fields">
-        <summary>Optional litigation exposure inputs</summary>
-        <div class="field-grid le-grid">
-          <label>Deal size (USD)
-            <input name="deal_size" type="number" min="50000" max="5000000" step="any" placeholder="50,000–5,000,000">
-          </label>
-          <fieldset class="choice-field">
-            <legend>Liability cap</legend>
-            <div class="choice-buttons">
-              <label class="choice-option"><input type="radio" name="liability_cap" value="0"><span>No</span></label>
-              <label class="choice-option"><input type="radio" name="liability_cap" value="1"><span>Yes</span></label>
-            </div>
-            <p class="choice-help">No = absent. Yes = stated; the LE model treats a cap as protective.</p>
-          </fieldset>
-          <fieldset class="choice-field">
-            <legend>Auto renewal</legend>
-            <div class="choice-buttons">
-              <label class="choice-option"><input type="radio" name="auto_renewal" value="0"><span>No</span></label>
-              <label class="choice-option"><input type="radio" name="auto_renewal" value="1"><span>Yes</span></label>
-            </div>
-            <p class="choice-help">Yes = the agreement renews automatically; the model treats this as a minor risk.</p>
-          </fieldset>
-          <label class="range-field">
-            <span class="range-heading"><span>Jurisdiction risk</span><output id="jurisdiction-risk-value" for="jurisdiction-risk" aria-live="polite">5 / 10</output></span>
-            <input id="jurisdiction-risk" name="jurisdiction_risk" type="range" min="1" max="10" step="1" value="5" data-output="jurisdiction-risk-value" aria-label="Jurisdiction risk: 1 stable to 10 highly adversarial">
-            <span class="range-extremes"><span>1 = Stable</span><span>10 = Highly adversarial</span></span>
-          </label>
-          <fieldset class="choice-field">
-            <legend>Indemnification protection</legend>
-            <div class="choice-buttons">
-              <label class="choice-option"><input type="radio" name="indemnification_clause" value="0"><span>No</span></label>
-              <label class="choice-option"><input type="radio" name="indemnification_clause" value="1"><span>Yes</span></label>
-            </div>
-            <p class="choice-help">No = weak or absent. Yes = strong and clearly scoped.</p>
-          </fieldset>
-          <fieldset class="choice-field">
-            <legend>Prior disputes with this counterparty</legend>
-            <div class="choice-buttons">
-              <label class="choice-option"><input type="radio" name="dispute_history" value="0"><span>No</span></label>
-              <label class="choice-option"><input type="radio" name="dispute_history" value="1"><span>Yes</span></label>
-            </div>
-            <p class="choice-help">No = none. Yes = a prior dispute with this counterparty.</p>
-          </fieldset>
-          <label class="range-field">
-            <span class="range-heading"><span>Governing law clarity</span><output id="governing-law-value" for="governing-law-clarity" aria-live="polite">3 / 5</output></span>
-            <input id="governing-law-clarity" name="governing_law_clarity" type="range" min="1" max="5" step="1" value="3" data-output="governing-law-value" aria-label="Governing law clarity: 1 vague or contested to 5 clear and predictable">
-            <span class="range-extremes"><span>1 = Vague or contested</span><span>5 = Clear and predictable</span></span>
-          </label>
-          <label class="range-field">
-            <span class="range-heading"><span>Clause deviation</span><output id="clause-deviation-value" for="clause-deviation" aria-live="polite">0.50</output></span>
-            <input id="clause-deviation" name="clause_deviation_score" type="range" min="0" max="1" step="0.01" value="0.50" data-output="clause-deviation-value" aria-label="Clause deviation: 0 standard clauses to 1 maximum deviation">
-            <span class="range-extremes"><span>0 = Standard clauses</span><span>1 = Maximum deviation</span></span>
-          </label>
-        </div>
-        <p class="field-note">Enter the deal size and choose Yes or No for all four items. Adjust each slider to match the contract. These inputs are required to run the experimental LE model.</p>
-      </details>
-
-      <div class="form-actions">
-        <p id="form-error" class="error-text" role="alert" aria-live="polite"></p>
-        <button id="submit-button" class="button-primary" type="submit"><span>Analyze contract</span><svg class="button-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15m-6-6 6 6-6 6" /></svg></button>
-      </div>
-    </form>
-
-    <section id="progress-panel" class="progress-panel" hidden aria-live="polite">
-      <div class="progress-topline"><div><p class="eyebrow">LIVE ANALYSIS</p><h2 id="progress-title">Preparing your contract</h2></div><span id="progress-percent" class="progress-percent">0%</span></div>
-      <progress id="progress-bar" max="100" value="0">0%</progress>
-      <ol id="progress-log" class="progress-log" aria-label="Analysis progress"></ol>
-      <p class="progress-caption">Progress is based on completed workflow stages and clauses; individual model calls can take longer.</p>
-    </section>
-
-    <section id="results" class="results" hidden>
-      <div class="results-heading"><div><p class="eyebrow">ANALYSIS REPORT</p><h2 id="result-title">Contract results</h2><p id="result-meta" class="muted"></p></div>
-        <div class="download-actions"><a id="download-json" class="button-secondary" href="#">Download JSON</a><a id="download-pdf" class="button-secondary" href="#">Download PDF</a></div>
-      </div>
-      <p id="review-notice" class="review-notice">Automated decision support. Human review is required.</p>
-      <div id="agent-statuses" class="status-strip" aria-label="Agent statuses"></div>
-      <div id="warnings" class="warning-list"></div>
-
-      <section class="result-section" id="cr-results"><div class="result-section-heading"><h3>Clause risk analysis</h3><span id="clause-count" class="count-label"></span></div><div id="clauses-list"></div></section>
-      <section class="result-section" id="cl-results"><div class="result-section-heading"><h3>Confidentiality &amp; leakage</h3></div><div id="cl-content"></div></section>
-      <section class="result-section" id="coi-results"><div class="result-section-heading"><h3>Conflict of interest</h3></div><div id="coi-content"></div></section>
-      <section class="result-section" id="le-results"><div class="result-section-heading"><h3>Litigation exposure</h3></div><div id="le-content"></div></section>
-    </section>
-
-    <footer><span>LexGuard local analysis</span><span>Models provide decision support; have legal counsel review the contract.</span></footer>
-  </main>
-</body>
-</html>
+<html data-theme="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1" name="viewport"/><meta content="LexGuard helps legal teams review contracts through specialist conflict, clause, confidentiality, and litigation signals." name="description"/><meta content="#141311" name="theme-color"/><title>Clarity for every contract · LexGuard</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="/static/styles.css" rel="stylesheet"/><script>(function(){try{var t=localStorage.getItem('lexguard-theme');document.documentElement.dataset.theme=t==='light'||t==='dark'?t:(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}})();</script><script defer="" src="/static/app.js"></script><link href="/static/atelier.css" rel="stylesheet"/><script defer="" src="/static/atelier-motion.js"></script><link href="/static/lexguard-logo.svg" rel="icon" type="image/svg+xml"/></head><body data-page="home"><svg aria-hidden="true" class="icon-defs" xmlns="http://www.w3.org/2000/svg"><symbol id="i-arrow" viewbox="0 0 24 24"><path d="M5 12h14m-7-7 7 7-7 7"></path></symbol><symbol id="i-arrow-up" viewbox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"></path></symbol><symbol id="i-moon" viewbox="0 0 24 24"><path d="M20.8 14.6A9 9 0 0 1 9.4 3.2 9 9 0 1 0 20.8 14.6Z"></path></symbol><symbol id="i-sun" viewbox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4"></path></symbol><symbol id="i-shield" viewbox="0 0 24 24"><path d="m12 2 8 4v6c0 5.1-3.2 8.5-8 10-4.8-1.5-8-4.9-8-10V6l8-4Z"></path><path d="m9 12 2 2 4-4"></path></symbol><symbol id="i-layers" viewbox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"></path></symbol><symbol id="i-lock" viewbox="0 0 24 24"><rect height="10" rx="2" width="14" x="5" y="11"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></symbol><symbol id="i-scale" viewbox="0 0 24 24"><path d="M12 3v18m-8-3h16M5 7h14M7 7l-4 7h8L7 7Zm10 0-4 7h8l-4-7Z"></path></symbol><symbol id="i-file" viewbox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7Z"></path><path d="M13 2v7h7M8 14h8M8 18h6"></path></symbol><symbol id="i-upload" viewbox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"></path></symbol><symbol id="i-check" viewbox="0 0 24 24"><path d="m4 12 5 5L20 6"></path></symbol><symbol id="i-alert" viewbox="0 0 24 24"><path d="m12 3 10 18H2L12 3Zm0 7v4m0 4h.01"></path></symbol><symbol id="i-chevron" viewbox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></symbol><symbol id="i-download" viewbox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 18v3h16v-3"></path></symbol><symbol id="i-x" viewbox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"></path></symbol><symbol id="i-refresh" viewbox="0 0 24 24"><path d="M20 8a8 8 0 1 0 1 7m-1-7V3m0 5h-5"></path></symbol></svg><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><div class="shell header-inner"><a aria-label="LexGuard home" class="brand" href="/"><span aria-hidden="true" class="lexguard-logo brand-logo"></span><span>lexguard<span class="brand-point">.</span></span></a><nav aria-label="Primary navigation" class="desktop-nav"><a aria-current="page" class="nav-link active" href="/">Overview</a><a class="nav-link" href="/review">New review</a><a class="nav-link" href="/workspaces">Workspaces</a></nav><div class="header-actions"><span class="live-chip" title="Actual API readiness"><span class="live-dot"></span><span data-system-label="">Checking system</span></span><button aria-label="Toggle dark and light theme" class="theme-switch" data-theme-toggle="" title="Change theme" type="button"><svg aria-hidden="true" class="icon"><use href="#i-moon"></use></svg><svg aria-hidden="true" class="icon"><use href="#i-sun"></use></svg></button><a class="btn btn-small btn-outline" href="/review">Start a review<svg aria-hidden="true" class="icon"><use href="#i-arrow"></use></svg></a></div><button aria-controls="mobile-nav" aria-expanded="false" aria-label="Toggle menu" class="menu-toggle" data-menu-toggle="" type="button"><span></span><span></span><span></span></button></div><nav aria-label="Mobile navigation" class="mobile-nav" hidden="" id="mobile-nav"><a href="/">Overview</a><a href="/review">New review</a><a href="/workspaces">Workspaces</a><a href="/results">Latest results</a><a href="/advanced">Developer console</a></nav></header><main id="main"><section class="hero"><div class="hero-grid shell"><div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span> CONTRACT INTELLIGENCE / CONSIDERED DIFFERENTLY <span class="serial">NO. 001 / INTELLIGENCE SYSTEMS</span></div><h1>The art of<br/><em>reading</em><br/><span class="hero-light">between lines.</span></h1><p class="hero-lede">Four specialist perspectives, one more considered decision. Uncover what matters in your contracts without losing human nuance.</p><div class="hero-actions"><a class="btn btn-primary" href="/review">Review a contract<svg aria-hidden="true" class="icon"><use href="#i-arrow"></use></svg></a><a class="btn btn-quiet" href="/workspaces">Explore workspaces<svg aria-hidden="true" class="icon"><use href="#i-arrow"></use></svg></a></div><div class="hero-bottom"><div class="rule-line"></div><span class="micro-index">01 — 04</span><span>Four focused agents. One considered decision.</span></div></div><div aria-label="Illustrative agreement with a highlighted clause and four specialist lenses" class="hero-art" role="img">
+<div aria-hidden="true" class="halo halo-one"></div><div aria-hidden="true" class="halo halo-two"></div>
+<div aria-hidden="true" class="hero-orb"></div>
+<div class="orbit-label orbit-a">01 <span>•</span> Conflict</div><div class="orbit-label orbit-b">02 <span>•</span> Clause</div><div class="orbit-label orbit-c">03 <span>•</span> Privacy</div><div class="orbit-label orbit-d">04 <span>•</span> Exposure</div>
+<div class="floating-sheet">
+<div class="sheet-head"><span class="sheet-brand"><span aria-hidden="true" class="lexguard-logo"></span> LEXGUARD</span><span>AGREEMENT / 001</span></div>
+<div class="sheet-title">Master services<br/><i>agreement.</i></div>
+<div class="paper-rule"></div><div class="sheet-line w94"></div><div class="sheet-line w76"></div><div class="sheet-line w89"></div><div class="sheet-line w65"></div>
+<div class="paper-analysis"><div><strong>03 / LIABILITY &amp; INDEMNITY</strong><span>Highlighted for human review ↗</span></div></div>
+<div class="sheet-line w94"></div><div class="sheet-line w82"></div><div class="sheet-line w60"></div>
+<div class="paper-footer"><span>HUMAN JUDGMENT</span><span>REQUIRED ↗</span></div>
+</div>
+<div aria-hidden="true" class="hero-glass"><span class="lexguard-logo"></span></div>
+</div></div><div class="hero-side-index">ARCHIVE / 142 — LEXGUARD</div></section>
+<section class="section section-lenses shell" id="capabilities"><div class="section-intro"><div><p class="kicker">THE INTELLIGENCE LAYERS <span>— 001</span></p><h2>Clarity from <em>every angle.</em></h2></div><p>One document. Four distinct questions. Findings remain separated so your team can assess the evidence—not a misleading composite score.</p></div><div class="lens-grid"><a class="lens-card" href="/tools/conflicts"><span class="lens-number">01 / COI</span><div class="lens-icon"><svg aria-hidden="true" class="icon"><use href="#i-layers"></use></svg></div><h3>Conflict intelligence</h3><p>Examine entity relationships and potential conflicts in the connected graph.</p><span class="link-line">Investigate connections <span>↗</span></span></a><a class="lens-card" href="/tools/clauses"><span class="lens-number">02 / CR</span><div class="lens-icon"><svg aria-hidden="true" class="icon"><use href="#i-file"></use></svg></div><h3>Clause intelligence</h3><p>See LegalBERT classifications, clause by clause, with clear model caveats.</p><span class="link-line">Explore clause risk <span>↗</span></span></a><a class="lens-card" href="/tools/confidentiality"><span class="lens-number">03 / CL</span><div class="lens-icon"><svg aria-hidden="true" class="icon"><use href="#i-lock"></use></svg></div><h3>Privacy intelligence</h3><p>Surface sensitive information before it moves beyond the right people.</p><span class="link-line">Review exposure <span>↗</span></span></a><a class="lens-card" href="/tools/litigation"><span class="lens-number">04 / LE</span><div class="lens-icon"><svg aria-hidden="true" class="icon"><use href="#i-scale"></use></svg></div><h3>Exposure intelligence</h3><p>Explore a model-estimated risk signal using verified graph inputs.</p><span class="link-line">Understand exposure <span>↗</span></span></a></div></section>
+<section class="feature-band"><div class="shell feature-layout"><div class="feature-art"><div class="feature-art-caption">INTELLIGENCE / EXPLAINED</div><div aria-hidden="true" class="feature-target"><span class="feature-halo feature-halo-one"></span><span class="feature-halo feature-halo-two"></span><span class="feature-orb"></span><div class="feature-mini-sheet"><div class="feature-mini-head"><span>LEXGUARD</span><span>REVIEW / 04</span></div><div class="feature-mini-title">The details<br/><em>matter.</em></div><span class="feature-mini-rule"></span><span class="feature-mini-line line-long"></span><span class="feature-mini-line line-mid"></span><div class="feature-mini-highlight"><span class="feature-highlight-dot"></span><span>Evidence linked to clause 03</span></div><span class="feature-mini-line line-short"></span><div class="feature-mini-foot"><span>CONTEXT</span><span>BEFORE CERTAINTY</span></div></div><span class="feature-tag feature-tag-left">01 / EVIDENCE</span><span class="feature-tag feature-tag-right">02 / REVIEW</span></div><div class="feature-art-bottomline"><span>CONTRACT INTELLIGENCE</span><span>HUMAN JUDGMENT REQUIRED</span></div></div><div class="feature-copy"><p class="kicker">NOT ANOTHER BLACK BOX — 002</p><h2>Intelligence should<br/><em>feel intelligible.</em></h2><p>Legal work is too important for unexplained scores. LexGuard shows which checks ran, which could not, and where a person needs to look next.</p><div class="feature-list"><div><span>01</span><div><h4>Guided, not overwhelming</h4><p>Start with a document and follow a considered, three-step flow.</p></div></div><div><span>02</span><div><h4>Evidence before certainty</h4><p>Each agent keeps its own status, findings, and limitations visible.</p></div></div><div><span>03</span><div><h4>Human in control</h4><p>The interface never claims that an AI review equals legal approval.</p></div></div></div><a class="btn btn-outline" href="/workspaces">Enter the workspace<svg aria-hidden="true" class="icon"><use href="#i-arrow"></use></svg></a></div></div></section>
+<section class="section shell journey"><div class="section-intro"><div><p class="kicker">A BETTER WAY TO REVIEW — 003</p><h2>Thoughtful from<br/><em>start to finish.</em></h2></div><p>Designed around recognition over recall, progressive disclosure, and clear next actions.</p></div><div class="journey-steps"><div class="journey-step"><span class="step-symbol">↳</span><span class="step-index">01 / PREPARE</span><h3>Bring the agreement.</h3><p>Upload a TXT, PDF or DOCX, or paste contract text directly into the review.</p></div><div class="journey-step"><span class="step-symbol">⌁</span><span class="step-index">02 / CONTEXT</span><h3>Add what matters.</h3><p>Identify the parties and provide factual deal context for exposure modeling.</p></div><div class="journey-step"><span class="step-symbol"><span aria-hidden="true" class="lexguard-logo"></span></span><span class="step-index">03 / INTERPRET</span><h3>Act with context.</h3><p>Explore agent-specific outcomes, incomplete checks, and reasons for review.</p></div></div></section><section class="cta-section"><div class="shell cta-inner"><div><p class="kicker">THE DETAILS MATTER</p><h2>Make room for <em>better decisions.</em></h2><p>Your next agreement deserves more than a cursory glance.</p></div><a class="btn btn-bright" href="/review">Begin a guided review<svg aria-hidden="true" class="icon"><use href="#i-arrow"></use></svg></a></div></section></main><footer class="site-footer"><div class="shell footer-inner"><div class="footer-brand"><span class="footer-icon"><span aria-hidden="true" class="lexguard-logo"></span></span> lexguard <span class="divider-dot">/</span> Clarity with context.</div><div class="footer-links"><a href="/workspaces">Explore agents</a><a href="/advanced">Developer console</a><a href="/docs" rel="noopener" target="_blank">API reference ↗</a></div><span class="copyright">AI-assisted signals. Human judgement required.</span></div></footer><div aria-live="polite" class="toast" hidden="" id="toast" role="status"></div></body></html>

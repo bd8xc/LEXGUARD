@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>LexGuard | Developer console</title>
+<link href="/static/advanced.css" rel="stylesheet"/>
+<script defer="" src="/static/advanced.js"></script>
+<link href="/static/lexguard-logo.svg" rel="icon" type="image/svg+xml"/></head>
+<body>
+<header class="topbar">
+<div class="container topbar-inner">
+<div class="brand"><span aria-hidden="true" class="lexguard-logo"></span><strong>LexGuard</strong><span>Developer console</span></div>
+<div class="topbar-right"><a href="/workspaces">Back to workspaces</a><span class="system-state" id="system-state" role="status">Checking services…</span><a href="/docs" rel="noopener noreferrer" target="_blank">All endpoints in Swagger ↗</a></div>
+</div>
+</header>
+<main class="container">
+<section aria-labelledby="status-title" class="panel">
+<div class="panel-heading"><div><h1 id="status-title">Agent status</h1><p>Current service readiness</p></div><button class="secondary-button" id="refresh-status" type="button">Refresh</button></div>
+<div class="status-grid">
+<div class="status-item"><span class="agent-code">COI</span><span>Conflict of interest</span><span class="service-pill" id="status-coi">Checking</span></div>
+<div class="status-item"><span class="agent-code">CR</span><span>Contract risk</span><span class="service-pill" id="status-cr">Checking</span></div>
+<div class="status-item"><span class="agent-code">CL</span><span>Confidentiality leakage</span><span class="service-pill" id="status-cl">Checking</span></div>
+<div class="status-item"><span class="agent-code">LE</span><span>Litigation exposure</span><span class="service-pill" id="status-le">Checking</span></div>
+</div>
+<p class="meta-line" id="status-extra"></p>
+</section>
+<section aria-labelledby="request-title" class="panel">
+<div class="panel-heading"><div><h2 id="request-title">Send a JSON request</h2><p>Choose an endpoint, edit the sample, and send it.</p></div></div>
+<form id="request-form">
+<div class="request-controls">
+<div class="field"><label for="endpoint">Endpoint</label><select id="endpoint"><option value="/api/tools/conflicts">POST /api/tools/conflicts / COI</option><option value="/api/tools/clauses">POST /api/tools/clauses / CR</option><option value="/api/tools/confidentiality">POST /api/tools/confidentiality / CL</option><option value="/api/tools/litigation">POST /api/tools/litigation / COI + LE</option></select></div>
+<button class="secondary-button" id="load-sample" type="button">Reset sample JSON</button>
+</div>
+<p class="hint" id="endpoint-note"></p>
+<div class="field"><label for="request-json">JSON body</label><textarea aria-describedby="json-help" class="json-editor" id="request-json" required="" spellcheck="false"></textarea><small id="json-help">The selected endpoint receives this JSON exactly as shown.</small></div>
+<div class="upload-tool"><label for="file" id="file-label">Load contract file into contract_text for CR or CL</label><input accept=".txt,.pdf,.docx" id="file" type="file"/><small id="file-status" role="status">TXT, PDF, or DOCX up to 5 MB.</small></div>
+<div class="form-actions"><button class="primary-button" id="submit" type="submit">Send request</button><span>The litigation route runs a fresh COI check; it never accepts a caller-supplied conflict flag.</span></div>
+<p class="form-error" hidden="" id="form-error" role="alert"></p>
+</form>
+</section>
+<section aria-labelledby="results-title" class="panel results-section" hidden="" id="results">
+<div class="panel-heading"><div><h2 id="results-title">Response</h2><p id="result-meta"></p></div><button class="secondary-button" id="download" type="button">Download JSON</button></div>
+<div class="response-summary" id="result-summary"></div>
+<div id="visual-results"></div>
+<details class="raw-details"><summary>View raw JSON</summary><pre class="response-json" id="raw-json"></pre></details>
+</section>
+</main>
+</body>
+</html>

@@ -1,14 +1,17 @@
 # Conflict of Interest (COI)
 
-`ConflictOfInterestAgent` searches a Neo4j graph for bounded, evidence-bearing paths between a client, counterparty, and other named entities. Incomplete or unresolved searches do not produce a safe conflict flag. The web app invokes the agent through the root coordinator.
+`ConflictOfInterestAgent` searches a Neo4j graph for bounded relationship paths among the entered client, counterparty, and additional entities. It reads existing graph facts. The current contract is not ingested into the graph.
 
-From the repository root, set the Neo4j values in `.env`, then run:
+## Local Neo4j
+
+From the repository root, create a local `.env` from `.env.example` and replace `NEO4J_PASSWORD=replace_me` with a unique password. Keep `.env` private. Then start the dedicated container:
 
 ```powershell
 docker compose --env-file .env -f agents/coi/compose.yaml up -d
-.\.venv\Scripts\python.exe -m coi --client "Alpha Corp" --counterparty "Beta Technologies" --doc-id DEMO
 ```
 
-The root Swagger UI exposes the same routes as `/api/coi/check`, `/api/risk/assess`, and `/api/le/predict`. The standalone API remains `coi.api.main:app` with the original paths. The isolated LE route accepts caller-supplied graph results; use the combined routes for a COI-verified handoff. `graph_manager.py` owns database access, `conflict_agent.py` owns search policy, and `extractor.py` plus `ingester.py` handle optional document ingestion. `ldi/pipeline.py` is the COI PDF-to-graph wrapper; the shared indexed LDI pipeline is at `../../ingestion_pipeline/ldi`.
+The Compose service uses `neo4j:5.26-community`, persists data in named Docker volumes, and binds Bolt and Neo4j Browser to `127.0.0.1:7687` and `127.0.0.1:7474`. The same password in `.env` configures the container and the Python graph client. Neo4j's initial password applies only to a new data volume; changing `.env` later does not change an existing database password.
 
-`legacy-export.json` and `lexguard_db` preserve the Kuzu migration source. Imported legacy relationships lack source clauses and stay unverified. `migrate_kuzu.py` provides export and import commands; the local `.legacy-export` environment is only for the one-time export. Tests live in [tests](tests/README.md).
+Check `http://127.0.0.1:8000/api/status` after starting the LexGuard backend. `coi: ready` means the configured Bolt connection authenticated successfully. The specialist API is `POST /api/tools/conflicts`; the guided review is at `/review`.
+
+The new graph starts empty. Unknown names produce an unresolved COI result and cannot supply the conflict flag required by LE. Add relationship records from an approved source before using COI for a real review. `synthetic_graph.py` is a separate test fixture and should not be mistaken for real evidence.

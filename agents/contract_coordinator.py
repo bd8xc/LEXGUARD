@@ -418,7 +418,8 @@ def _run_coi(doc_id: str, operator_input: dict[str, Any]) -> dict[str, Any]:
             "method": "Neo4j graph search only; the submitted contract was not ingested into the graph.",
         }
     except Exception as exc:
-        return {"status": "unavailable", "reason": f"COI Neo4j graph search failed ({type(exc).__name__})."}
+        detail = str(exc) if type(exc).__name__ == "GraphQueryError" else type(exc).__name__
+        return {"status": "unavailable", "reason": f"COI Neo4j graph search failed ({detail})."}
     finally:
         if graph is not None:
             try:
