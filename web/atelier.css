@@ -472,3 +472,26 @@ body[data-page=results] .state-caption{max-width:230px;margin-top:16px;color:var
   .contribution-axis,.contribution-row{grid-template-columns:minmax(78px,31%) minmax(0,1fr) 70px;gap:7px}
   .contribution-name,.contribution-value{font-size:9px}
 }
+
+.range-field{gap:8px}
+.range-label{color:var(--text);font-size:12px;font-weight:600}
+.range-value-row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:30px}
+.range-value{color:var(--accent);font-size:12px;font-variant-numeric:tabular-nums;font-weight:700}
+.range-toggle{min-height:30px;padding:5px 10px;border:1px solid var(--line2);border-radius:2px;background:transparent;color:var(--muted);font:inherit;font-size:10px;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease}
+.range-toggle:hover{border-color:var(--accent);color:var(--text)}
+.range-toggle:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.field input[type=range]{width:100%;height:20px;min-height:20px;padding:0;border:0;border-radius:0;background:transparent;accent-color:var(--accent);cursor:pointer}
+.field input[type=range]:disabled{cursor:not-allowed;opacity:.45}
+.field input[type=range]:focus-visible{outline:2px solid var(--focus);outline-offset:2px;box-shadow:none}
+.range-endpoints{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:10px;line-height:1.45}
+.range-endpoints span:last-child{text-align:right}
+.range-endpoints b{color:var(--text);font-variant-numeric:tabular-nums}
+.choice-field{min-width:0;margin-top:0;padding:0;border:0}
+.choice-field legend{width:100%;margin:0 0 9px;padding:0;color:var(--text);font-size:12px;font-weight:600}
+.choice-buttons{display:flex;gap:8px}
+.choice-button{position:relative;display:block;flex:1;min-width:0;margin:0;cursor:pointer}
+.field .choice-button input{position:absolute;width:1px;height:1px;min-height:0;padding:0;border:0;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap}
+.choice-button span{display:flex;justify-content:center;align-items:center;min-height:47px;padding:10px 14px;border:1px solid var(--line2);border-radius:2px;background:var(--bg);color:var(--text);font-size:12px;transition:border-color .16s ease,background .16s ease,color .16s ease}
+.choice-button:hover span{border-color:var(--accent)}
+.field .choice-button input:checked+span{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg));color:var(--text)}
+.field .choice-button input:focus-visible+span{outline:2px solid var(--focus);outline-offset:2px}

@@ -27,7 +27,11 @@ function node(tag, className = "", value) {
 function add(parent, ...children) { children.filter(Boolean).forEach(child => parent.append(child)); return parent; }
 function text(value, fallback = "—") { return value === null || value === undefined || value === "" ? fallback : String(value); }
 function list(value) { return Array.isArray(value) ? value : []; }
-function field(form, name) { return form.elements.namedItem(name)?.value?.trim() || ""; }
+function field(form, name) {
+  const control = form.elements.namedItem(name);
+  if (control?.type === "range" && control.dataset.set !== "true") return "";
+  return control?.value?.trim() || "";
+}
 function entities(value) { return value.split(/[,;\n]+/).map(item => item.trim()).filter(Boolean); }
 function message(error) {
   if (Array.isArray(error?.detail)) return error.detail.map(item => (item.loc || []).slice(1).join(".") + ": " + item.msg).join("; ");
@@ -95,6 +99,28 @@ function numericInputs(form) {
     if (value !== "") result[name] = Number(value);
   }
   return result;
+}
+function setupOptionalRanges(form) {
+  $$('input[data-optional-range="true"]', form).forEach(range => {
+    const output = document.getElementById(range.dataset.output);
+    const toggle = form.querySelector('[aria-controls="' + range.id + '"]');
+    if (!output || !toggle) return;
+    const update = () => {
+      output.value = range.name === "clause_deviation_score"
+        ? Number(range.value).toFixed(2)
+        : range.value + " / " + range.max;
+    };
+    range.addEventListener("input", update);
+    toggle.addEventListener("click", () => {
+      const enabled = range.dataset.set !== "true";
+      range.dataset.set = String(enabled);
+      range.disabled = !enabled;
+      toggle.setAttribute("aria-pressed", String(enabled));
+      toggle.textContent = enabled ? "Clear" : "Set value";
+      output.value = enabled ? (range.name === "clause_deviation_score" ? Number(range.value).toFixed(2) : range.value + " / " + range.max) : "Not set";
+      if (enabled) range.focus();
+    });
+  });
 }
 function validate(form, step) {
   form._invalidInput = null;
@@ -204,6 +230,7 @@ function reviewInit() {
   const area = $("#contract-text");
   area.addEventListener("input", () => $("#char-count").textContent = area.value.length.toLocaleString() + " characters");
   setupExtraction("#review-file", "#contract-text");
+  setupOptionalRanges(form);
   $("#load-example").addEventListener("click", () => {
     $("#review-file")._cancelExtraction();
     area.value = exampleContract;
@@ -227,7 +254,7 @@ function reviewInit() {
     if (step === 3) {
       const recap = $("#review-recap");
       recap.replaceChildren();
-      for (const [name, value] of [["CLIENT", field(form, "client_entity") || "Not supplied"], ["COUNTERPARTY", field(form, "counterparty_entity") || "Not supplied"], ["DOCUMENT", area.value.length.toLocaleString() + " characters"], ["LE INPUTS", Object.keys(numericInputs(form)).length + " of 7"]]) {
+      for (const [name, value] of [["CLIENT", field(form, "client_entity") || "Not supplied"], ["COUNTERPARTY", field(form, "counterparty_entity") || "Not supplied"], ["DOCUMENT", area.value.length.toLocaleString() + " characters"], ["LE INPUTS", Object.keys(numericInputs(form)).length + " of 7"], ["CLAUSE DEVIATION", field(form, "clause_deviation_score") || "Not set"]]) {
         add(recap, add(node("div"), node("small", "", name), node("strong", "", value)));
       }
     }
