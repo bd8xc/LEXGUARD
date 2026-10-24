@@ -4,13 +4,15 @@ The integrated entry point extracts a TXT, PDF, or DOCX contract once with Inges
 
 ## Setup
 
-From `D:\lexguard`, install the combined runtime dependencies into the existing environment:
+From the repository root, create a virtual environment and install the combined runtime dependencies:
 
 ```powershell
+py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r .\requirements-agents.txt
+Copy-Item .env.example .env
 ```
 
-Copy `.env.example` to `.env`, then set the Neo4j connection values to enable COI graph search. Do not commit or share `.env`.
+Set the Neo4j connection values in `.env` to enable COI graph search. Do not commit or share `.env`.
 
 Set `LEXGUARD_LLM_API_STYLE`, `LEXGUARD_LLM_BASE_URL`, and `LEXGUARD_LLM_MODEL` to configure CR's clause-level LLM. Defaults use local Ollama (`ollama`, `http://localhost:11434`, `qwen2.5:1.5b`). An OpenAI-compatible server can be used by setting `LEXGUARD_LLM_API_STYLE=openai_compatible` and its base URL ending in `/v1`; set `LEXGUARD_LLM_API_KEY` only if that server requires it. Keep contract-serving endpoints on a private network.
 
@@ -26,7 +28,7 @@ Install dependencies into the existing environment if needed:
 .\.venv\Scripts\python.exe -m pip install -r .\requirements-agents.txt
 ```
 
-Start the local web backend from `D:\lexguard`:
+Start the local web backend from the repository root:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
