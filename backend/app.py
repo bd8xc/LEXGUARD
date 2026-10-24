@@ -5,6 +5,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import json
 from pathlib import Path
+import re
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
@@ -56,6 +57,7 @@ async def submit_contract(
     file: UploadFile = File(...),
     client_entity: str = Form(""),
     counterparty_entity: str = Form(""),
+    additional_entities: str = Form(""),
     deal_size: float | None = Form(None),
     liability_cap: float | None = Form(None),
     auto_renewal: float | None = Form(None),
@@ -89,6 +91,10 @@ async def submit_contract(
     if clause_deviation_score is not None and not 0 <= clause_deviation_score <= 1:
         raise HTTPException(422, "clause_deviation_score must be between 0 and 1.")
 
+    extra_entities = [name.strip() for name in re.split(r"[,;\n]+", additional_entities) if name.strip()]
+    if len(extra_entities) > 13:
+        raise HTTPException(422, "Enter no more than 13 additional entities.")
+
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     saved_path = UPLOAD_DIR / f"{uuid4().hex}{suffix}"
     size = 0
@@ -111,6 +117,7 @@ async def submit_contract(
     operator_input = {
         "client_entity": client_entity.strip(),
         "counterparty_entity": counterparty_entity.strip(),
+        "additional_entities": extra_entities,
         "le_features": {name: value for name, value in le_values.items() if value is not None},
         "clause_deviation_score": clause_deviation_score,
     }

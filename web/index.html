@@ -42,7 +42,10 @@
           <input name="counterparty_entity" type="text" placeholder="e.g. Alpha Labs" autocomplete="off">
         </label>
       </div>
-      <p class="field-note">COI checks the configured Neo4j graph. LE runs when all its fields are supplied and COI returns a known flag.</p>
+      <label class="wide-field">Additional entities (optional)
+        <input name="additional_entities" type="text" placeholder="e.g. Alpha Holdings, Anurag Demo" autocomplete="off" aria-describedby="additional-entities-help">
+      </label>
+      <p id="additional-entities-help" class="field-note">Separate additional people or companies with commas. COI checks these names against the configured Neo4j graph. LE runs when all its fields are supplied and COI returns a known flag.</p>
 
       <details class="le-fields">
         <summary>Optional litigation exposure inputs</summary>
