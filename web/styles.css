@@ -61,7 +61,7 @@ input:focus-visible { border-color: var(--green); box-shadow: 0 0 0 3px #174b3c1
 .field-note { margin: 9px 0 0; }
 .le-fields { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .le-fields summary { width: fit-content; color: var(--green); cursor: pointer; font-size: 12px; font-weight: 700; }
-.le-grid { margin-top: 18px; }
+.le-grid { align-items: start; margin-top: 18px; }
 .choice-field { min-width: 0; margin: 0; padding: 0; border: 0; }
 .choice-field legend { padding: 0; color: #3d4a44; font-size: 12px; font-weight: 650; }
 .choice-buttons { display: flex; gap: 8px; margin-top: 7px; }
