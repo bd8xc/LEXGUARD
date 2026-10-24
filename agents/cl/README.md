@@ -1,36 +1,13 @@
 # Confidentiality Leakage (CL)
 
-The `ConfidentialityLeakageAgent` scans contract clauses for structured
-identifiers and terms indicating personal data, sensitive personal data,
-business-confidential information, processing activities, and contextual
-entities. It combines independent detectors, deduplicates/classifies findings,
-and produces its own bounded 0-100 confidentiality `risk_score` and
-`risk_level`.
+The CL agent detects personal, sensitive, and business-confidential content in clauses. The root coordinator sends it every contract paragraph directly and redacts finding values in the web API response. Direct analysis does not require ChromaDB.
 
-In the contract API, CL scans the segmented document once. The browser shows
-the agent's risk score/band, counts by sensitivity and data category, and a
-findings table with clause/line locations and masked evidence. Processing
-activities are presented as handling context, not as proof of a leak.
+The unified Swagger UI exposes direct text analysis at `/api/cl/analyze` and indexed document analysis at `/api/ingestion/confidentiality/analyze`.
 
-The report contains raw finding values in memory for programmatic use. Mask
-them before returning reports outside a trusted local workflow. Context-
-dependent NER matches alone do not establish a leak. NER uses a narrow local
-fallback; deterministic detectors continue to run if optional NLP packages or
-models are absent.
+`confidentiality_leakage/` contains detection, classification, scoring, schemas, and the optional standalone router. Indexed document ingestion and search live in [the shared LDI pipeline](../../ingestion_pipeline/ldi/README.md). All dependencies are listed in the root `requirements.txt`.
 
-Direct analysis does not require ChromaDB:
+Run focused tests from the repository root:
 
-```python
-from agents.cl.confidentiality_leakage import ConfidentialityLeakageAgent
-
-agent = ConfidentialityLeakageAgent()
-report = agent.analyze(
-    doc_id="contract-001",
-    clauses=[{"clause_id": "4.2", "text": "Paste clause text here."}],
-)
-print(report.model_dump())
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q ingestion_pipeline/ldi/tests/test_confidentiality_leakage_agent.py ingestion_pipeline/ldi/tests/test_confidentiality_document_resolution.py
 ```
-
-The optional indexed-document router requires the separate LDI vector-store
-package and is not mounted by the contract API. Direct CL analysis does not
-require ChromaDB or another vector database.

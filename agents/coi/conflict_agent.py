@@ -9,7 +9,7 @@ from time import monotonic
 from typing import Any
 
 from neo4j.exceptions import Neo4jError, DriverError
-from .domain import ConflictReport, TRIGGERS, entity_key, entity_match_key
+from .domain import ConflictReport, TRIGGERS, entity_key
 from .graph_manager import GraphQueryError, SearchLimitError, get_graph
 
 MAX_HOPS = 3
@@ -39,8 +39,8 @@ class ConflictOfInterestAgent:
             raise ValueError("doc_id is required")
         names = [client_entity, counterparty_entity, *(contract_entities or []), *(additional_entities or [])]
         keys = sorted({entity_key(n) for n in names})
-        requested_party_keys = {entity_key(client_entity), entity_key(counterparty_entity)}
-        if len(requested_party_keys) != 2:
+        party_keys = {entity_key(client_entity), entity_key(counterparty_entity)}
+        if len(party_keys) != 2:
             raise ValueError("Client and counterparty must be different entities")
         day = date.fromisoformat(as_of) if as_of else date.today()
         start = monotonic()
@@ -55,12 +55,7 @@ class ConflictOfInterestAgent:
             context = graph.read_view() if hasattr(graph, "read_view") else nullcontext(graph)
             with context as view:
                 resolved = view.resolve_entities(names)
-                resolved_by_match = {entity_match_key(name): key for key, name in resolved.items()}
-                report.unresolved_entities = [n for n in names if entity_match_key(n) not in resolved_by_match]
-                party_keys = {
-                    resolved_by_match.get(entity_match_key(client_entity), entity_key(client_entity)),
-                    resolved_by_match.get(entity_match_key(counterparty_entity), entity_key(counterparty_entity)),
-                }
+                report.unresolved_entities = [n for n in names if entity_key(n) not in resolved]
                 if party_keys - resolved.keys():
                     report.status = "unknown"
                     report.skipped_reason = "entity_resolution_failed"

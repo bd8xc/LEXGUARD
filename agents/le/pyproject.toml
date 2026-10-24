@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lexguard-le"
+version = "1.0.0"
+requires-python = ">=3.11"
+dependencies = [] # Install all project dependencies from the repository root requirements.txt.
+
+[project.scripts]
+le-check = "le.run_litigation_agent:main"
+
+[tool.setuptools]
+packages = ["le", "le.agent"]
+package-dir = {"le" = "."}
+
+[tool.setuptools.package-data]
+le = ["litigation_model.ubj", "feature_names.json", "model_manifest.json"]

@@ -1,35 +1,34 @@
-# Local environment and credentials
+# Local credentials
 .env
 .env.*
 !.env.example
 
 # Python environments and generated files
 .venv/
-.venv*/
 venv/
 __pycache__/
 **/__pycache__/
 *.py[cod]
 *.log
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# Nested source checkout and artifacts that do not belong in ordinary Git
-agents/cra/.git/
-.cra-git-backup/
-agents/cra/checkpoints/
-agents/cra/outputs/
-agents/cra/reporting/runs/
-agents/cra/archives/original_snapshots/
+# Local app data and model artifacts
+tmp/
+contracts/uploads/
 outputs/
+agents/cr/outputs/
+agents/cr/checkpoints/
+agents/coi/lexguard_db
+
+# Downloaded or packaged archives
+*.zip
 
 # Editor and OS files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-
-agents/cra/notebooks/augmntation.ipynb
-agents/cra/notebooks/seed_csv.ipynb

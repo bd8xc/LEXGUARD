@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#122520">
+  <title>LexGuard · Contract review</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="LexGuard home"><span class="brand-mark">L</span><span>LEXGUARD</span></a>
+    <div class="local-indicator"><span class="pulse-dot"></span> LOCAL WORKSPACE</div>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <p class="eyebrow">CONTRACT INTELLIGENCE</p>
+      <h1>Review a contract.</h1>
+      <p class="intro-copy">Run clause risk, Indian Contract Act retrieval, confidentiality, conflict, and litigation checks in one place.</p>
+    </section>
+
+    <form id="contract-form" class="form-panel">
+      <div class="section-heading">
+        <div><h2>Start an analysis</h2><p>Choose a document and provide the party details used by the conflict check.</p></div>
+        <span class="step-label">ONE DOCUMENT</span>
+      </div>
+
+      <label class="upload-zone" for="contract-file">
+        <span class="upload-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5v4h14v-4" /></svg></span>
+        <span class="upload-title" id="upload-title">Choose a contract to upload</span>
+        <span class="upload-hint">PDF, DOCX, or TXT · up to 50 MB</span>
+        <input id="contract-file" name="file" type="file" accept=".pdf,.docx,.txt,application/pdf" required>
+      </label>
+
+      <div class="field-grid parties-grid">
+        <label>Client / primary party
+          <input name="client_entity" type="text" placeholder="e.g. Alpha Org" autocomplete="organization">
+        </label>
+        <label>Counterparty
+          <input name="counterparty_entity" type="text" placeholder="e.g. Alpha Labs" autocomplete="off">
+        </label>
+      </div>
+      <p class="field-note">COI checks the configured Neo4j graph. LE runs when all its fields are supplied and COI returns a known flag.</p>
+
+      <details class="le-fields">
+        <summary>Optional litigation exposure inputs</summary>
+        <div class="field-grid le-grid">
+          <label>Deal size (USD)
+            <input name="deal_size" type="number" min="50000" max="5000000" step="any" placeholder="50,000–5,000,000">
+          </label>
+          <label>Liability cap / deal size
+            <input name="liability_cap" type="number" min="0" max="1" step="any" placeholder="0–1">
+          </label>
+          <label>Auto renewal (0 or 1)
+            <input name="auto_renewal" type="number" min="0" max="1" step="1" placeholder="0 or 1">
+          </label>
+          <label>Jurisdiction risk (1–10)
+            <input name="jurisdiction_risk" type="number" min="1" max="10" step="any" placeholder="1–10">
+          </label>
+          <label>Indemnification present (0 or 1)
+            <input name="indemnification_clause" type="number" min="0" max="1" step="1" placeholder="0 or 1">
+          </label>
+          <label>Prior dispute history (0 or 1)
+            <input name="dispute_history" type="number" min="0" max="1" step="1" placeholder="0 or 1">
+          </label>
+          <label>Governing law clarity (1–5)
+            <input name="governing_law_clarity" type="number" min="1" max="5" step="any" placeholder="1–5">
+          </label>
+          <label>Clause deviation (0–1)
+            <input name="clause_deviation_score" type="number" min="0" max="1" step="any" placeholder="0–1">
+          </label>
+        </div>
+        <p class="field-note">Leave these blank to skip LE. All seven contract features and clause deviation are required to run it.</p>
+      </details>
+
+      <div class="form-actions">
+        <p id="form-error" class="error-text" role="alert" aria-live="polite"></p>
+        <button id="submit-button" class="button-primary" type="submit"><span>Analyze contract</span><svg class="button-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15m-6-6 6 6-6 6" /></svg></button>
+      </div>
+    </form>
+
+    <section id="progress-panel" class="progress-panel" hidden aria-live="polite">
+      <div class="progress-topline"><div><p class="eyebrow">LIVE ANALYSIS</p><h2 id="progress-title">Preparing your contract</h2></div><span id="progress-percent" class="progress-percent">0%</span></div>
+      <progress id="progress-bar" max="100" value="0">0%</progress>
+      <ol id="progress-log" class="progress-log" aria-label="Analysis progress"></ol>
+      <p class="progress-caption">Progress is based on completed workflow stages and clauses; individual model calls can take longer.</p>
+    </section>
+
+    <section id="results" class="results" hidden>
+      <div class="results-heading"><div><p class="eyebrow">ANALYSIS REPORT</p><h2 id="result-title">Contract results</h2><p id="result-meta" class="muted"></p></div>
+        <div class="download-actions"><a id="download-json" class="button-secondary" href="#">Download JSON</a><a id="download-pdf" class="button-secondary" href="#">Download PDF</a></div>
+      </div>
+      <p id="review-notice" class="review-notice">Automated decision support. Human review is required.</p>
+      <div id="agent-statuses" class="status-strip" aria-label="Agent statuses"></div>
+      <div id="warnings" class="warning-list"></div>
+
+      <section class="result-section" id="cr-results"><div class="result-section-heading"><h3>Clause risk analysis</h3><span id="clause-count" class="count-label"></span></div><div id="clauses-list"></div></section>
+      <section class="result-section" id="cl-results"><div class="result-section-heading"><h3>Confidentiality &amp; leakage</h3></div><div id="cl-content"></div></section>
+      <section class="result-section" id="coi-results"><div class="result-section-heading"><h3>Conflict of interest</h3></div><div id="coi-content"></div></section>
+      <section class="result-section" id="le-results"><div class="result-section-heading"><h3>Litigation exposure</h3></div><div id="le-content"></div></section>
+    </section>
+
+    <footer><span>LexGuard local analysis</span><span>Models provide decision support; have legal counsel review the contract.</span></footer>
+  </main>
+</body>
+</html>

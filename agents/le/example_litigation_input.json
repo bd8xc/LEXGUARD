@@ -1,0 +1,13 @@
+{
+  "entities": {
+    "deal_size": 750000,
+    "liability_cap": 0,
+    "auto_renewal": 1,
+    "jurisdiction_risk": 8,
+    "indemnification_clause": 0,
+    "dispute_history": 1,
+    "governing_law_clarity": 2
+  },
+  "graph_results": {"conflict_flag": 1},
+  "clause_deviation_score": 0.7
+}

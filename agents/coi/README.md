@@ -1,59 +1,14 @@
 # Conflict of Interest (COI)
 
-COI extracts named entities from the contract and searches Neo4j for known relationships between the client and counterparty. The API can also accept explicit party hints; those names are searched alongside NER results. A clause-text shared-director pattern is reported as a potential finding and is labeled as unverified graph evidence.
+`ConflictOfInterestAgent` searches a Neo4j graph for bounded, evidence-bearing paths between a client, counterparty, and other named entities. Incomplete or unresolved searches do not produce a safe conflict flag. The web app invokes the agent through the root coordinator.
 
-## Configuration
-
-Set these values in the repository root `.env` file:
-
-```dotenv
-NEO4J_URI=bolt://localhost:7688
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=replace-with-a-strong-random-password
-NEO4J_DATABASE=neo4j
-COI_QUERY_TIMEOUT=15
-```
-
-Start the local Neo4j Community instance from the repository root:
+From the repository root, set the Neo4j values in `.env`, then run:
 
 ```powershell
-docker compose up -d neo4j
+docker compose --env-file .env -f agents/coi/compose.yaml up -d
+.\.venv\Scripts\python.exe -m coi --client "Alpha Corp" --counterparty "Beta Technologies" --doc-id DEMO
 ```
 
-The browser is at `http://localhost:7475`; the application connects over Bolt on port `7688`. Configure the same password in `.env` before the database's first start. Do not commit `.env`.
+The root Swagger UI exposes the same routes as `/api/coi/check`, `/api/risk/assess`, and `/api/le/predict`. The standalone API remains `coi.api.main:app` with the original paths. The isolated LE route accepts caller-supplied graph results; use the combined routes for a COI-verified handoff. `graph_manager.py` owns database access, `conflict_agent.py` owns search policy, and `extractor.py` plus `ingester.py` handle optional document ingestion. `ldi/pipeline.py` is the COI PDF-to-graph wrapper; the shared indexed LDI pipeline is at `../../ingestion_pipeline/ldi`.
 
-## Seed a fictional graph
-
-```powershell
-python -m agents.coi.seed_demo_graph
-```
-
-The seeder creates 50 fictional companies, 50 fictional people, and 200 synthetic relationships. It is intended for local demonstration, not production data.
-
-## Contract API
-
-`POST /analyze-contract` accepts optional party hints:
-
-```json
-{
-  "parties": {
-    "client": "Alpha Orb Technologies Ltd",
-    "counterparty": "Acme Components Pvt. Ltd",
-    "additional": ["Aarav Mehta"]
-  }
-}
-```
-
-NER-detected names from `contract_text` are included in the graph search. COI returns `party_roles`, `entities`, `clause_findings`, and `graph_result`. `graph_result.status: "unknown"` or `entity_resolution_failed` indicates the lookup could not establish the requested party relationship; it is not a verified negative conflict result. Review graph status and evidence together.
-
-Each successful contract ingestion writes a `COISource` and its `COIClause` nodes. Detected person, company, and location names become `COIEntity` nodes connected to the clause by `EXTRACTED_FROM`. Explicit relationship wording creates a typed `COI_RELATES_TO` edge with the contract ID, clause ID, evidence text, and `verified: false`. This uses the existing COI relationship vocabulary. A repeated upload of identical bytes replaces that document's old graph evidence in one transaction. Entity co-occurrence alone does not create a relationship edge. Neo4j must be reachable for the ingestion to succeed.
-
-The LE agent consumes the COI conflict flag. If the COI result has no conflict value, the current contract pipeline sends a fallback `0` to LE and labels its source in the response. This fallback means no positive COI result was available; it is not proof that the graph found no conflict.
-
-## Data and limitations
-
-- Ensure client and counterparty names match nodes in the graph, or add explicit aliases through the graph manager.
-- NER can miss, merge, or misclassify names. Supplied party hints improve entity resolution but do not establish a relationship by themselves.
-- Clause-text potential findings are not graph-verified.
-- Relationship results depend on the completeness and freshness of the Neo4j data.
-- Use synthetic data for demos; graph nodes and edges may contain personal or confidential information.
+`legacy-export.json` and `lexguard_db` preserve the Kuzu migration source. Imported legacy relationships lack source clauses and stay unverified. `migrate_kuzu.py` provides export and import commands; the local `.legacy-export` environment is only for the one-time export. Tests live in [tests](tests/README.md).

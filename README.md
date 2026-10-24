@@ -1,103 +1,63 @@
-# LEXGUARD
+# Contract agent runner
 
-LEXGUARD is a contract analysis prototype with a browser interface and a FastAPI backend. It runs four independent analysis agents and presents their results together:
+The integrated entry point extracts a TXT, PDF, or DOCX contract once with Ingestion Pipeline 2 and splits it once. For each clause, CR runs LegalBERT, retrieves candidate Indian Contract Act provisions, and sends only that clause's text, CR signal, and retrieved provisions to the grounded LLM. CL, COI, and LE outputs are not sent to the LLM; they remain separate sections in the final JSON. Groq is disconnected. COI searches the existing Neo4j graph using the client and counterparty entered in the form or CLI; it does not ingest relationships from the current contract. LE runs only with a complete COI result and all required feature values. There is no contract-wide final synthesis call.
 
-- **CRA - Contract Risk Analysis:** clause-level LegalBERT risk predictions, Indian-law retrieval, and local LLM explanations.
-- **CL - Confidentiality Leakage:** detects personal data, sensitive personal data, business-confidential terms, and processing activity context.
-- **COI - Conflict of Interest:** combines contract NER and supplied party names with a Neo4j relationship graph; clause text may also identify an unverified shared-director pattern.
-- **LE - Litigation Exposure:** optional contract-level model prediction using manually supplied contract facts. COI supplies the conflict-of-interest flag.
+## Setup
 
-This is a research and review aid, not legal advice. Model outputs require qualified human review. Do not submit real confidential or personal data to an untrusted deployment.
-
-## Repository layout
-
-```text
-api.py                         FastAPI application and browser API
-combined_analysis.py           CLI launcher
-static/                        Browser frontend
-ingestion_pipeline/            TXT, PDF, DOCX ingestion and clause segmentation
-agents/cra/                    CRA models, retrieval, LLM, and orchestration
-agents/cl/                     Confidentiality Leakage agent
-agents/coi/                    Neo4j-backed Conflict of Interest agent
-agents/litigation_agent/       Litigation Exposure model and intake
-sample_contracts/              Synthetic/demo contract
-sample_json/                   Example contract intake
-docker-compose.yml             Local Neo4j service
-```
-
-See each agent's README for its inputs, outputs, and limitations:
-[CRA](agents/cra/README.md) · [CL](agents/cl/README.md) · [COI](agents/coi/README.md) · [LE](agents/litigation_agent/README.md).
-
-## Prerequisites
-
-- Python 3.12 or newer (use a Python version supported by the installed PyTorch release).
-- Git and Docker Desktop with Docker Compose for Neo4j-backed COI searches.
-- Ollama with the `qwen2.5:1.5b` model for CRA LLM explanations.
-- The project CRA fine-tuned checkpoint at `agents/cra/checkpoints/best_model.pt`. This approximately 1.3 GB model file is intentionally excluded from ordinary Git commits. Obtain the approved artifact from the project maintainer or train it using the CRA training workflow before starting the service.
-
-The first CRA initialization also downloads LegalBERT and the sentence-transformer embedding model from Hugging Face. Ensure network access is available for that first run, or pre-cache the models.
-
-## Local setup (PowerShell)
-
-Run these commands from the repository root:
+From `D:\lexguard`, install the combined runtime dependencies into the existing environment:
 
 ```powershell
-py -3.12 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
+.\.venv\Scripts\python.exe -m pip install -r .\requirements-agents.txt
 ```
 
-Set a strong local Neo4j password in `.env` and use the same credentials when starting the database. `.env` is ignored by Git; keep real credentials there and never commit them.
+Copy `.env.example` to `.env`, then set the Neo4j connection values to enable COI graph search. Do not commit or share `.env`.
 
-Start Neo4j and seed the fictional demo graph:
+Set `LEXGUARD_LLM_API_STYLE`, `LEXGUARD_LLM_BASE_URL`, and `LEXGUARD_LLM_MODEL` to configure CR's clause-level LLM. Defaults use local Ollama (`ollama`, `http://localhost:11434`, `qwen2.5:1.5b`). An OpenAI-compatible server can be used by setting `LEXGUARD_LLM_API_STYLE=openai_compatible` and its base URL ending in `/v1`; set `LEXGUARD_LLM_API_KEY` only if that server requires it. Keep contract-serving endpoints on a private network.
+
+CR loads its model from `checkpoints\best_model.pt` or `agents\cr\checkpoints\best_model.pt`. If neither file exists, CR reports `unavailable` while the other agents continue where possible.
+
+## Run
+
+### Browser app
+
+Install dependencies into the existing environment if needed:
 
 ```powershell
-docker compose up -d neo4j
-python -m agents.coi.seed_demo_graph
+.\.venv\Scripts\python.exe -m pip install -r .\requirements-agents.txt
 ```
 
-Neo4j Browser is available at `http://localhost:7475`; Bolt uses `bolt://localhost:7688`. The graph seeder uses fictional demo entities and relationships.
-
-Install and start Ollama separately, then download the configured model:
+Start the local web backend from `D:\lexguard`:
 
 ```powershell
-ollama pull qwen2.5:1.5b
+.\.venv\Scripts\python.exe -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 ```
 
-Start the API and frontend from the project root:
+On each server start, the backend loads LegalBERT, the India-law embedding model and corpus vectors, and the LLM client once before it accepts uploads. This initial warm-up is printed in the server terminal. Later contracts reuse those loaded objects; restarting the backend loads them again. Each document is still extracted and split on its own. Open `http://127.0.0.1:8000` in your browser. Upload a PDF, DOCX, or TXT file, enter COI parties, and optionally fill all seven LE features plus clause deviation. Analysis runs one job at a time. Clause-level progress appears in the browser and in the server terminal; the terminal output remains available while the browser shows the progress bar and event log. Results include separate CR, CL, COI, and LE findings plus JSON/PDF download links. Uploads are saved under `contracts\uploads\` and reports under `agents\cr\outputs\`.
+
+### CLI
 
 ```powershell
-python -m uvicorn api:app --reload
+.\.venv\Scripts\python.exe -m agents.cr.analyze_contract
 ```
 
-Open `http://127.0.0.1:8000` for the Atelier browser UI or `http://127.0.0.1:8000/docs` for Swagger. The UI has a guided review at `/review`, tab-local results at `/results`, specialist tools under `/tools/`, and a JSON developer console at `/advanced`. Models initialize in the background when the UI opens. The readiness panel and health checkpoints show each agent's state. Keep one Uvicorn process running; each worker would load its own model copies.
+The CLI remains available and prints the same progress events. It asks for a contract path plus client and counterparty names for the Neo4j graph lookup. For the synthetic demo PDF and seeded graph, enter `Alpha Org` and `Alpha Labs`. It then prompts for LE's seven contract features and clause-deviation score. Enter all eight to run LE; leave any blank to skip it. The COI conflict flag is supplied directly by Neo4j and is not an operator input.
 
-## API and analysis inputs
+## Synthetic COI demo
 
-- `POST /analyze-contract` runs CRA, CL, and COI. Set `include_litigation_exposure` to `true` to request LE.
-- `POST /build-le-intake` validates the form-style LE flags and numeric inputs and returns the corresponding JSON shape.
-- `POST /initialize` starts model initialization; `GET /initialization-status` reports progress.
-- `POST /agent-health-check` and `GET /agent-health` run and report agent health checks; COI's check needs Neo4j.
-- `GET /health` checks the API process.
-- `/api/status`, `/api/extract`, `/api/analyze`, and the `/api/{coi,cr,cl,le,risk}/...` routes support the integrated browser pages. File extraction previews text; running an analysis ingests that text and updates the KG. The browser holds its latest review report in tab-local session storage.
+The separate demo command seeds the configured Neo4j database with 100 fictional companies, 50 fictional people, 123 relationships, and LOW/MEDIUM/HIGH trigger edges. Company names are like `Alpha Org`; person names are like `Anurag Demo`. It then runs one COI example at each severity. Every row is labeled `SYNTHETIC DEMO ONLY`; rerunning replaces the fixture and removes orphaned nodes from the earlier generic fixture.
 
-Swagger accepts plaintext in `contract_text`, optional party hints in `parties.client`, `parties.counterparty`, and `parties.additional`, and optional LE fields. See [`sample_json/example_contract_intake.json`](sample_json/example_contract_intake.json). COI searches supplied names alongside NER entities. Both primary party names should resolve to graph entities for a meaningful relationship search.
+```powershell
+.\.venv\Scripts\python.exe -m agents.coi.demo
+```
 
-The browser output shows the CRA clause LLM fields, CL confidentiality score/counts/findings, and COI/LE result cards. LE features are manually entered; the COI conflict flag is managed by the pipeline. When COI does not provide a conflict result, the current LE pipeline uses a documented fallback value of `0`; that fallback means no positive conflict result was available, not that the graph verified no conflict.
+The integrated contract runner can search these demo relationships when the entered parties match the seeded companies. `Alpha Org` and `Alpha Labs` share a synthetic director and demonstrate a LOW conflict. Its COI result comes from the existing graph; no relationships are extracted from the submitted contract.
 
-Supported contract ingestion includes UTF-8 TXT, text-based PDF, and DOCX. Scanned PDFs require OCR before ingestion. Every successful ingestion through the API or CLI updates Neo4j with a source document, segmented clauses, detected people/companies/locations, and explicitly stated relationships. Extracted relationships carry clause text as evidence and remain unverified. The response metadata includes KG entity and relationship counts. Neo4j must be available for ingestion to succeed; reingesting identical bytes replaces that document's graph evidence.
+Reports are written to `agents\cr\outputs\` as separate JSON and PDF files. CL-detected sensitive values are masked in exported evidence. The `review_required` field remains true; agent scores are not combined. LE's model was trained using synthetic labels, so its score is not a calibrated real-world litigation probability.
 
-## Models and GitHub artifacts
+## Runtime behavior
 
-The large CRA checkpoint is excluded by `.gitignore` because GitHub's normal Git object limits are unsuitable for a 1.3 GB file. A clone needs this file at `agents/cra/checkpoints/best_model.pt` before CRA initialization. Arrange a separately approved model artifact distribution (for example, an access-controlled model store or Git LFS with sufficient quota); do not put private contracts, credentials, model caches, or generated analysis outputs into the repository.
-
-The LE `litigation_model.joblib` is a small required model artifact and remains tracked with its agent. Its predictions are based on the training data and should be treated as experimental, not as calibrated real-world litigation probabilities.
-
-## Notes for contributors
-
-- Root `requirements.txt` lists direct runtime dependencies. Install into a virtual environment.
-- Generated caches, local credentials, CRA checkpoints/outputs, and the nested CRA Git metadata are excluded by `.gitignore`.
-- Review `.env.example` before deployment and change the demo credentials/password.
-- Do not commit real contracts or personal data. Use synthetic examples in issues and pull requests.
+- If text extraction or clause splitting fails, downstream agents are not called.
+- COI graph lookup needs Neo4j and matching entities in the graph. It does not call Groq or write contract relationships.
+- LE is skipped if COI is incomplete or if any required LE feature is missing. Its model was trained on synthetic labels and its score is not a calibrated real-world probability.
+- Only CR clause data and its retrieved Indian Contract Act passages are submitted to the per-clause LLM; CL, COI, and LE outputs remain outside its prompts.
+- LegalBERT's raw model scores are not calibrated probabilities. Each clause remains marked for human review.
